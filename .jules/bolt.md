@@ -1,0 +1,3 @@
+## 2025-01-24 - Consolidated O(N) traversals in InsightsEngine
+**Learning:** The `InsightsEngine` was performing up to 10 full traversals (filtering, mapping, folding) over the same data sets (`historicalData` and `todayData`) to calculate various metrics (total time, category times, late night usage). For small datasets, this is negligible, but as the user's history grows, this pattern leads to significant performance degradation on the UI thread.
+**Action:** Consolidate multiple O(N) traversals into a single-pass loop that populates a metrics object. This ensures the engine remains fast regardless of the amount of historical data being processed.
