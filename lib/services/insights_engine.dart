@@ -2,10 +2,10 @@ import 'package:child_safety_monitor/data/models/activity_log.dart';
 
 /// Insight types for categorization
 enum InsightType {
-  warning,    // Yellow - concerning trends
-  positive,   // Green - good behavior
-  anomaly,    // Red - significant deviation
-  neutral,    // Blue - informational
+  warning, // Yellow - concerning trends
+  positive, // Green - good behavior
+  anomaly, // Red - significant deviation
+  neutral, // Blue - informational
 }
 
 /// Represents a single AI-generated insight
@@ -33,10 +33,43 @@ class Insight {
   });
 }
 
+/// Internal helper for aggregating activity metrics in a single pass
+class _ActivityMetrics {
+  int totalScreenTime = 0;
+  int gamingTime = 0;
+  int educationTime = 0;
+  int socialTime = 0;
+  int lateNightTime = 0;
+  final Map<String, int> dailyTotalScreenTime = {};
+
+  void addLog(ActivityLog log) {
+    totalScreenTime += log.screenTime;
+    if (log.category == ActivityCategory.gaming) gamingTime += log.screenTime;
+    if (log.category == ActivityCategory.education) educationTime += log.screenTime;
+    if (log.category == ActivityCategory.social) socialTime += log.screenTime;
+
+    if (log.timestamp.hour >= 22 || log.timestamp.hour < 6) {
+      lateNightTime += log.screenTime;
+    }
+
+    final dayKey =
+        '${log.timestamp.year}-${log.timestamp.month}-${log.timestamp.day}';
+    dailyTotalScreenTime[dayKey] =
+        (dailyTotalScreenTime[dayKey] ?? 0) + log.screenTime;
+  }
+
+  double get avgDailyScreenTime => dailyTotalScreenTime.isEmpty
+      ? 0
+      : dailyTotalScreenTime.values.reduce((a, b) => a + b) /
+          dailyTotalScreenTime.length;
+}
+
 /// AI Insights Engine - Analyzes activity patterns and generates insights
 class InsightsEngine {
-  
   /// Generate daily insights by comparing today's data with historical averages
+  ///
+  /// PERFORMANCE OPTIMIZATION: This method uses a single-pass aggregation pattern
+  /// to avoid multiple O(N) traversals of activity data.
   static List<Insight> generateDailyInsights({
     required String childId,
     required String childName,
@@ -44,225 +77,161 @@ class InsightsEngine {
     required List<ActivityLog> todayData,
   }) {
     final insights = <Insight>[];
-    
-    // Filter historical data to last 7 days
-    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-    final last7DaysData = historicalData.where((log) => 
-      log.timestamp.isAfter(sevenDaysAgo) && log.childId == childId
-    ).toList();
-    
-    // Calculate average daily screen time for last 7 days
-    final avgDailyScreenTime = _calculateAverageDailyScreenTime(last7DaysData);
-    
-    // Calculate today's total screen time
-    final todayTotal = todayData
-      .where((log) => log.childId == childId)
-      .fold<int>(0, (sum, log) => sum + log.screenTime);
-    
-    // 1. Check for usage anomaly (>30% higher than average)
+    final now = DateTime.now();
+    final sevenDaysAgo = now.subtract(const Duration(days: 7));
+
+    // 1. Single-pass aggregation for today's data
+    final todayMetrics = _ActivityMetrics();
+    for (final log in todayData) {
+      if (log.childId == childId) {
+        todayMetrics.addLog(log);
+      }
+    }
+
+    // 2. Single-pass aggregation for historical data (last 7 days)
+    final historicalMetrics = _ActivityMetrics();
+    for (final log in historicalData) {
+      if (log.childId == childId && log.timestamp.isAfter(sevenDaysAgo)) {
+        historicalMetrics.addLog(log);
+      }
+    }
+
+    final avgDailyScreenTime = historicalMetrics.avgDailyScreenTime;
+    final todayTotal = todayMetrics.totalScreenTime;
+
+    // 3. Generate Insights using aggregated metrics
+
+    // A. Usage anomaly check
     if (avgDailyScreenTime > 0) {
-      final percentageChange = ((todayTotal - avgDailyScreenTime) / avgDailyScreenTime) * 100;
-      
+      final percentageChange =
+          ((todayTotal - avgDailyScreenTime) / avgDailyScreenTime) * 100;
+
       if (percentageChange > 30) {
         insights.add(Insight(
-          id: 'anomaly_${childId}_${DateTime.now().millisecondsSinceEpoch}',
+          id: 'anomaly_${childId}_${now.millisecondsSinceEpoch}',
           childId: childId,
           childName: childName,
           type: InsightType.anomaly,
           title: 'Usage Spike Detected',
-          message: '$childName is spending ${percentageChange.toStringAsFixed(0)}% more screen time than their weekly average.',
-          recommendation: 'Consider setting a screen time limit or encouraging a break.',
-          timestamp: DateTime.now(),
+          message:
+              '$childName is spending ${percentageChange.toStringAsFixed(0)}% more screen time than their weekly average.',
+          recommendation:
+              'Consider setting a screen time limit or encouraging a break.',
+          timestamp: now,
           percentageChange: percentageChange,
         ));
       } else if (percentageChange < -20) {
         insights.add(Insight(
-          id: 'positive_${childId}_${DateTime.now().millisecondsSinceEpoch}',
+          id: 'positive_${childId}_${now.millisecondsSinceEpoch}',
           childId: childId,
           childName: childName,
           type: InsightType.positive,
           title: 'Great Progress!',
-          message: '$childName has reduced screen time by ${percentageChange.abs().toStringAsFixed(0)}% compared to their weekly average!',
+          message:
+              '$childName has reduced screen time by ${percentageChange.abs().toStringAsFixed(0)}% compared to their weekly average!',
           recommendation: 'Keep up the healthy digital habits!',
-          timestamp: DateTime.now(),
+          timestamp: now,
           percentageChange: percentageChange,
         ));
       }
     }
-    
-    // 2. Check Gaming vs Education ratio
-    final gamingInsight = _checkGamingEducationRatio(childId, childName, todayData);
-    if (gamingInsight != null) {
-      insights.add(gamingInsight);
-    }
-    
-    // 3. Check for positive education trends
-    final educationInsight = _checkEducationProgress(childId, childName, historicalData, todayData);
-    if (educationInsight != null) {
-      insights.add(educationInsight);
-    }
-    
-    // 4. Check for late-night usage
-    final lateNightInsight = _checkLateNightUsage(childId, childName, todayData);
-    if (lateNightInsight != null) {
-      insights.add(lateNightInsight);
-    }
-    
-    // 5. Check social media trends
-    final socialInsight = _checkSocialMediaTrends(childId, childName, historicalData, todayData);
-    if (socialInsight != null) {
-      insights.add(socialInsight);
-    }
-    
-    return insights;
-  }
-  
-  /// Calculate average daily screen time from historical data
-  static double _calculateAverageDailyScreenTime(List<ActivityLog> data) {
-    if (data.isEmpty) return 0;
-    
-    // Group by day and sum
-    final dailyTotals = <String, int>{};
-    for (final log in data) {
-      final dayKey = '${log.timestamp.year}-${log.timestamp.month}-${log.timestamp.day}';
-      dailyTotals[dayKey] = (dailyTotals[dayKey] ?? 0) + log.screenTime;
-    }
-    
-    if (dailyTotals.isEmpty) return 0;
-    return dailyTotals.values.reduce((a, b) => a + b) / dailyTotals.length;
-  }
-  
-  /// Check if Gaming exceeds Education by 3:1 ratio
-  static Insight? _checkGamingEducationRatio(String childId, String childName, List<ActivityLog> todayData) {
-    final childData = todayData.where((log) => log.childId == childId);
-    
-    final gamingTime = childData
-      .where((log) => log.category == ActivityCategory.gaming)
-      .fold<int>(0, (sum, log) => sum + log.screenTime);
-    
-    final educationTime = childData
-      .where((log) => log.category == ActivityCategory.education)
-      .fold<int>(0, (sum, log) => sum + log.screenTime);
-    
+
+    // B. Gaming vs Education ratio
+    final gamingTime = todayMetrics.gamingTime;
+    final educationTime = todayMetrics.educationTime;
+
     if (educationTime > 0 && gamingTime > educationTime * 3) {
       final ratio = (gamingTime / educationTime).toStringAsFixed(1);
-      return Insight(
-        id: 'gaming_ratio_${childId}_${DateTime.now().millisecondsSinceEpoch}',
+      insights.add(Insight(
+        id: 'gaming_ratio_${childId}_${now.millisecondsSinceEpoch}',
         childId: childId,
         childName: childName,
         type: InsightType.warning,
         title: 'Gaming Imbalance',
-        message: '$childName has spent ${ratio}x more time gaming than on educational content today.',
-        recommendation: 'Try balancing with some educational apps or reading time.',
-        timestamp: DateTime.now(),
-      );
+        message:
+            '$childName has spent ${ratio}x more time gaming than on educational content today.',
+        recommendation:
+            'Try balancing with some educational apps or reading time.',
+        timestamp: now,
+      ));
     } else if (educationTime > gamingTime * 2 && educationTime > 30) {
-      return Insight(
-        id: 'education_win_${childId}_${DateTime.now().millisecondsSinceEpoch}',
+      insights.add(Insight(
+        id: 'education_win_${childId}_${now.millisecondsSinceEpoch}',
         childId: childId,
         childName: childName,
         type: InsightType.positive,
         title: 'Learning Champion!',
-        message: '$childName prioritized education over gaming today - $educationTime mins of learning!',
+        message:
+            '$childName prioritized education over gaming today - $educationTime mins of learning!',
         recommendation: 'Great balance! Consider a fun reward.',
-        timestamp: DateTime.now(),
-      );
+        timestamp: now,
+      ));
     }
-    
-    return null;
-  }
-  
-  /// Check for positive education progress
-  static Insight? _checkEducationProgress(String childId, String childName, List<ActivityLog> historical, List<ActivityLog> today) {
-    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-    
-    final historicalEducation = historical
-      .where((log) => log.childId == childId && 
-                      log.category == ActivityCategory.education &&
-                      log.timestamp.isAfter(sevenDaysAgo))
-      .fold<int>(0, (sum, log) => sum + log.screenTime);
-    
-    final avgDailyEducation = historicalEducation / 7;
-    
-    final todayEducation = today
-      .where((log) => log.childId == childId && log.category == ActivityCategory.education)
-      .fold<int>(0, (sum, log) => sum + log.screenTime);
-    
+
+    // C. Education progress check
+    final avgDailyEducation = historicalMetrics.educationTime / 7;
+    final todayEducation = todayMetrics.educationTime;
+
     if (avgDailyEducation > 0 && todayEducation > avgDailyEducation * 1.2) {
-      final increase = ((todayEducation - avgDailyEducation) / avgDailyEducation * 100).toStringAsFixed(0);
-      return Insight(
-        id: 'education_up_${childId}_${DateTime.now().millisecondsSinceEpoch}',
+      final increase =
+          ((todayEducation - avgDailyEducation) / avgDailyEducation * 100)
+              .toStringAsFixed(0);
+      insights.add(Insight(
+        id: 'education_up_${childId}_${now.millisecondsSinceEpoch}',
         childId: childId,
         childName: childName,
         type: InsightType.positive,
         title: 'Extra Learning Today!',
-        message: '$childName spent $increase% more time on educational apps than usual!',
+        message:
+            '$childName spent $increase% more time on educational apps than usual!',
         recommendation: 'Fantastic focus! Keep encouraging this habit.',
-        timestamp: DateTime.now(),
+        timestamp: now,
         percentageChange: double.tryParse(increase),
-      );
+      ));
     }
-    
-    return null;
-  }
-  
-  /// Check for late-night device usage
-  static Insight? _checkLateNightUsage(String childId, String childName, List<ActivityLog> todayData) {
-    final lateNightUsage = todayData.where((log) => 
-      log.childId == childId && 
-      (log.timestamp.hour >= 22 || log.timestamp.hour < 6)
-    ).fold<int>(0, (sum, log) => sum + log.screenTime);
-    
+
+    // D. Late-night usage check
+    final lateNightUsage = todayMetrics.lateNightTime;
     if (lateNightUsage > 30) {
-      return Insight(
-        id: 'late_night_${childId}_${DateTime.now().millisecondsSinceEpoch}',
+      insights.add(Insight(
+        id: 'late_night_${childId}_${now.millisecondsSinceEpoch}',
         childId: childId,
         childName: childName,
         type: InsightType.warning,
         title: 'Late Night Activity',
-        message: '$childName used their device for $lateNightUsage minutes during sleep hours.',
-        recommendation: 'Consider enabling bedtime mode to ensure healthy sleep.',
-        timestamp: DateTime.now(),
-      );
+        message:
+            '$childName used their device for $lateNightUsage minutes during sleep hours.',
+        recommendation:
+            'Consider enabling bedtime mode to ensure healthy sleep.',
+        timestamp: now,
+      ));
     }
-    
-    return null;
-  }
-  
-  /// Check social media usage trends
-  static Insight? _checkSocialMediaTrends(String childId, String childName, List<ActivityLog> historical, List<ActivityLog> today) {
-    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-    
-    final historicalSocial = historical
-      .where((log) => log.childId == childId && 
-                      log.category == ActivityCategory.social &&
-                      log.timestamp.isAfter(sevenDaysAgo))
-      .fold<int>(0, (sum, log) => sum + log.screenTime);
-    
-    final avgDailySocial = historicalSocial / 7;
-    
-    final todaySocial = today
-      .where((log) => log.childId == childId && log.category == ActivityCategory.social)
-      .fold<int>(0, (sum, log) => sum + log.screenTime);
-    
+
+    // E. Social media trends
+    final avgDailySocial = historicalMetrics.socialTime / 7;
+    final todaySocial = todayMetrics.socialTime;
+
     if (avgDailySocial > 0 && todaySocial > avgDailySocial * 1.4) {
-      final increase = ((todaySocial - avgDailySocial) / avgDailySocial * 100).toStringAsFixed(0);
-      return Insight(
-        id: 'social_spike_${childId}_${DateTime.now().millisecondsSinceEpoch}',
+      final increase =
+          ((todaySocial - avgDailySocial) / avgDailySocial * 100)
+              .toStringAsFixed(0);
+      insights.add(Insight(
+        id: 'social_spike_${childId}_${now.millisecondsSinceEpoch}',
         childId: childId,
         childName: childName,
         type: InsightType.warning,
         title: 'Social Media Surge',
-        message: '$childName is spending $increase% more time on social media than their weekly average.',
+        message:
+            '$childName is spending $increase% more time on social media than their weekly average.',
         recommendation: 'Consider a digital detox break!',
-        timestamp: DateTime.now(),
+        timestamp: now,
         percentageChange: double.tryParse(increase),
-      );
+      ));
     }
-    
-    return null;
+
+    return insights;
   }
-  
+
   /// Generate demo insights for testing/presentation
   static List<Insight> generateDemoInsights() {
     return [
@@ -272,7 +241,8 @@ class InsightsEngine {
         childName: 'Ananya',
         type: InsightType.warning,
         title: 'Social Media Surge',
-        message: 'Ananya is spending 40% more time on Moj than her weekly average.',
+        message:
+            'Ananya is spending 40% more time on Moj than her weekly average.',
         recommendation: 'Consider a break!',
         timestamp: DateTime.now(),
         percentageChange: 40,
@@ -283,7 +253,8 @@ class InsightsEngine {
         childName: 'Arjun',
         type: InsightType.positive,
         title: 'Homework Hero!',
-        message: 'Arjun finished his homework 20% faster today compared to last week!',
+        message:
+            'Arjun finished his homework 20% faster today compared to last week!',
         recommendation: 'Great focus! Maybe reward with some game time.',
         timestamp: DateTime.now(),
         percentageChange: -20,
@@ -305,7 +276,8 @@ class InsightsEngine {
         childName: 'Ananya',
         type: InsightType.positive,
         title: 'Learning Champion!',
-        message: 'Ananya spent 2 hours on Khan Academy - double her weekly average!',
+        message:
+            'Ananya spent 2 hours on Khan Academy - double her weekly average!',
         recommendation: '🌟 Fantastic! Consider unlocking a new educational game.',
         timestamp: DateTime.now(),
         percentageChange: 100,
