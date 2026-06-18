@@ -33,8 +33,8 @@ final unreadAlertCountProvider = FutureProvider<int>((ref) {
 });
 
 // Provider for average risk level
-final averageRiskProvider = FutureProvider<int>((ref) {
-  return ref.watch(databaseProvider).getAverageRiskLevel();
+final averageRiskProvider = FutureProvider<double>((ref) {
+  return ref.watch(databaseProvider).getAverageRiskLevel().then((value) => value.toDouble());
 });
 
 // Provider for active children count
