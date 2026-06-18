@@ -1,5 +1,4 @@
 import 'package:child_safety_monitor/data/database/app_database.dart';
-import 'package:child_safety_monitor/data/models/behavioral_event.dart';
 import 'package:drift/drift.dart';
 
 class EventsRepository {
@@ -12,8 +11,7 @@ class EventsRepository {
           ..where((t) => t.childId.equals(childId))
           ..orderBy([(t) => OrderingTerm.desc(t.timestamp)])
           ..limit(limit))
-        .watch()
-        .map((events) => events.cast<BehavioralEvent>());
+        .watch();
   }
   Future<List<BehavioralEvent>> getEventsByDateRange(String childId, DateTime start, DateTime end) async {
     final results = await (db.select(db.behavioralEvents)
@@ -21,6 +19,6 @@ class EventsRepository {
           ..where((t) => t.timestamp.isBetweenValues(start, end))
           ..orderBy([(t) => OrderingTerm.desc(t.timestamp)]))
         .get();
-    return results.cast<BehavioralEvent>();
+    return results;
   }
 }
