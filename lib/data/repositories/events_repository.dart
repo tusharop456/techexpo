@@ -13,7 +13,20 @@ class EventsRepository {
           ..orderBy([(t) => OrderingTerm.desc(t.timestamp)])
           ..limit(limit))
         .watch()
-        .map((events) => events.cast<BehavioralEvent>());
+        .map((events) => events.map((e) => BehavioralEvent(
+          id: e.id,
+          childId: e.childId,
+          timestamp: e.timestamp,
+          durationSeconds: e.durationSeconds,
+          interactionCount: e.interactionCount,
+          newKnownContacts: e.newKnownContacts,
+          unknownContacts: e.unknownContacts,
+          appCategory: e.appCategory,
+          appName: e.appName,
+          deviceType: e.deviceType,
+          riskScore: e.riskScore,
+          riskLevel: e.riskLevel,
+        )).toList());
   }
   Future<List<BehavioralEvent>> getEventsByDateRange(String childId, DateTime start, DateTime end) async {
     final results = await (db.select(db.behavioralEvents)
@@ -21,6 +34,19 @@ class EventsRepository {
           ..where((t) => t.timestamp.isBetweenValues(start, end))
           ..orderBy([(t) => OrderingTerm.desc(t.timestamp)]))
         .get();
-    return results.cast<BehavioralEvent>();
+    return results.map((e) => BehavioralEvent(
+      id: e.id,
+      childId: e.childId,
+      timestamp: e.timestamp,
+      durationSeconds: e.durationSeconds,
+      interactionCount: e.interactionCount,
+      newKnownContacts: e.newKnownContacts,
+      unknownContacts: e.unknownContacts,
+      appCategory: e.appCategory,
+      appName: e.appName,
+      deviceType: e.deviceType,
+      riskScore: e.riskScore,
+      riskLevel: e.riskLevel,
+    )).toList();
   }
 }
