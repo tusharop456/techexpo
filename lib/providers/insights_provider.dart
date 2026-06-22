@@ -63,36 +63,54 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      final allInsights = <Insight>[];
-      bool hasAnyData = false;
+      final childIds = children.map((c) => c.id).toList();
       
+      // ⚡ Batch Fetching Optimization: Solve N+1 query problem
+      // 1. Fetch data sufficiency status for all children in one query
+      final enoughDataStatus = await _db.getEnoughDataStatusForChildren(childIds);
+      bool hasAnyData = enoughDataStatus.values.any((v) => v);
+
+      // 2. Fetch all logs for all children in two batch queries
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final sevenDaysAgo = now.subtract(const Duration(days: 7));
+
+      final allHistoricalLogs = await _db.getLogsForChildren(childIds, sevenDaysAgo);
+      final allTodayLogs = await _db.getLogsForChildren(childIds, todayStart);
+
+      // Group logs by childId for efficient lookup
+      final historicalByChild = <String, List<ActivityLog>>{};
+      final todayByChild = <String, List<ActivityLog>>{};
+
+      for (final e in allHistoricalLogs) {
+        final log = ActivityLog(
+          id: e.id,
+          childId: e.childId,
+          screenTime: e.screenTime,
+          timestamp: e.timestamp,
+          category: _parseCategory(e.category),
+          appName: e.appName,
+        );
+        historicalByChild.putIfAbsent(e.childId, () => []).add(log);
+      }
+
+      for (final e in allTodayLogs) {
+        final log = ActivityLog(
+          id: e.id,
+          childId: e.childId,
+          screenTime: e.screenTime,
+          timestamp: e.timestamp,
+          category: _parseCategory(e.category),
+          appName: e.appName,
+        );
+        todayByChild.putIfAbsent(e.childId, () => []).add(log);
+      }
+
+      final allInsights = <Insight>[];
+
       for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
-        // Convert database entries to ActivityLog model
-        final historical = historicalLogs.map((e) => ActivityLog(
-          id: e.id,
-          childId: e.childId,
-          screenTime: e.screenTime,
-          timestamp: e.timestamp,
-          category: _parseCategory(e.category),
-          appName: e.appName,
-        )).toList();
-        
-        final today = todayLogs.map((e) => ActivityLog(
-          id: e.id,
-          childId: e.childId,
-          screenTime: e.screenTime,
-          timestamp: e.timestamp,
-          category: _parseCategory(e.category),
-          appName: e.appName,
-        )).toList();
+        final historical = historicalByChild[child.id] ?? [];
+        final today = todayByChild[child.id] ?? [];
         
         // Generate insights using the engine
         final childInsights = InsightsEngine.generateDailyInsights(
