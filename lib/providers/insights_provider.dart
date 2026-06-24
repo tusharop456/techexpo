@@ -63,20 +63,43 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
+      final childIds = children.map((c) => c.id).toList();
+
+      // OPTIMIZATION: Use Future.wait to parallelize database calls
+      final results = await Future.wait([
+        _db.getEnoughDataStatusForChildren(childIds),
+        _db.getLogsForChildren(childIds, todayOnly: true),
+        _db.getLogsForChildren(childIds, todayOnly: false),
+      ]);
+
+      final dataStatusMap = results[0] as Map<String, bool>;
+      final allTodayLogs = results[1] as List<ActivityLogEntry>;
+      final allHistoricalLogs = results[2] as List<ActivityLogEntry>;
+
+      final hasAnyData = dataStatusMap.values.any((hasData) => hasData);
+
+      // Group logs by childId for processing
+      final logsByChildToday = <String, List<ActivityLogEntry>>{};
+      final logsByChildHistorical = <String, List<ActivityLogEntry>>{};
+
+      for (final log in allTodayLogs) {
+        (logsByChildToday[log.childId] ??= []).add(log);
+      }
+      for (final log in allHistoricalLogs) {
+        (logsByChildHistorical[log.childId] ??= []).add(log);
+      }
+
       final allInsights = <Insight>[];
-      bool hasAnyData = false;
       
       for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
+        // FIX: Only generate insights if there's enough data for this child
+        if (dataStatusMap[child.id] != true) continue;
+
+        final childTodayLogs = logsByChildToday[child.id] ?? [];
+        final childHistoricalLogs = logsByChildHistorical[child.id] ?? [];
         
         // Convert database entries to ActivityLog model
-        final historical = historicalLogs.map((e) => ActivityLog(
+        final historical = childHistoricalLogs.map((e) => ActivityLog(
           id: e.id,
           childId: e.childId,
           screenTime: e.screenTime,
@@ -85,7 +108,7 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           appName: e.appName,
         )).toList();
         
-        final today = todayLogs.map((e) => ActivityLog(
+        final today = childTodayLogs.map((e) => ActivityLog(
           id: e.id,
           childId: e.childId,
           screenTime: e.screenTime,
