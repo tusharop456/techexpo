@@ -64,19 +64,26 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
       }
       
       final allInsights = <Insight>[];
-      bool hasAnyData = false;
-      
+      final childIds = children.map((c) => c.id).toList();
+
+      // Parallelize batch data fetching
+      final results = await Future.wait([
+        _db.getEnoughDataStatusForChildren(childIds),
+        _db.getLogsForChildren(childIds, after: DateTime.now().subtract(const Duration(days: 7))),
+      ]);
+
+      final statusMap = results[0] as Map<String, bool>;
+      final allLogs = results[1] as List<ActivityLogEntry>;
+
+      final hasAnyData = statusMap.values.any((hasData) => hasData);
+      final today = DateTime.now();
+      final startOfToday = DateTime(today.year, today.month, today.day);
+
       for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
-        // Convert database entries to ActivityLog model
-        final historical = historicalLogs.map((e) => ActivityLog(
+        // Filter logs for this child from the batch result
+        final childLogs = allLogs.where((log) => log.childId == child.id);
+
+        final historical = childLogs.map((e) => ActivityLog(
           id: e.id,
           childId: e.childId,
           screenTime: e.screenTime,
@@ -84,24 +91,17 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           category: _parseCategory(e.category),
           appName: e.appName,
         )).toList();
-        
-        final today = todayLogs.map((e) => ActivityLog(
-          id: e.id,
-          childId: e.childId,
-          screenTime: e.screenTime,
-          timestamp: e.timestamp,
-          category: _parseCategory(e.category),
-          appName: e.appName,
-        )).toList();
-        
+
+        final todayLogs = historical.where((log) => log.timestamp.isAfter(startOfToday)).toList();
+
         // Generate insights using the engine
         final childInsights = InsightsEngine.generateDailyInsights(
           childId: child.id,
           childName: child.name,
           historicalData: historical,
-          todayData: today,
+          todayData: todayLogs,
         );
-        
+
         allInsights.addAll(childInsights);
       }
       
