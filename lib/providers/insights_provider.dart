@@ -63,17 +63,23 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
+      // Performance Optimization: Parallelize database fetches to avoid N+1 sequential waits
       final allInsights = <Insight>[];
       bool hasAnyData = false;
       
-      for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
+      final insightResults = await Future.wait(children.map((child) async {
+        // Parallel fetch for each child's data
+        final results = await Future.wait([
+          _db.hasEnoughDataForInsights(child.id),
+          _db.getLast7DaysLogs(child.id),
+          _db.getTodayLogs(child.id),
+        ]);
+
+        final hasData = results[0] as bool;
+        final historicalLogs = results[1] as List<ActivityLogEntry>;
+        final todayLogs = results[2] as List<ActivityLogEntry>;
+
         if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
         
         // Convert database entries to ActivityLog model
         final historical = historicalLogs.map((e) => ActivityLog(
@@ -95,13 +101,15 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         )).toList();
         
         // Generate insights using the engine
-        final childInsights = InsightsEngine.generateDailyInsights(
+        return InsightsEngine.generateDailyInsights(
           childId: child.id,
           childName: child.name,
           historicalData: historical,
           todayData: today,
         );
-        
+      }));
+
+      for (final childInsights in insightResults) {
         allInsights.addAll(childInsights);
       }
       

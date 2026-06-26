@@ -1,0 +1,3 @@
+## 2026-06-26 - Optimized Insights Engine and parallelized database fetches
+**Learning:** Found a significant performance bottleneck where the Insights Engine was performing multiple O(N) traversals over activity logs for each insight check. Additionally, database fetches for multiple children were being performed sequentially, leading to an N+1 query pattern.
+**Action:** Consolidate multiple O(N) traversals into a single-pass loop using a helper metrics class. Use Future.wait to parallelize independent database fetches in the provider layer. Always ensure a MigrationStrategy is provided when incrementing the database schema version to prevent crashes.
