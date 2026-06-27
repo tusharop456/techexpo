@@ -63,18 +63,21 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      final allInsights = <Insight>[];
-      bool hasAnyData = false;
-      
-      for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
+      // Optimization: Fetch data for all children in parallel using Future.wait
+      // This mitigates the N+1 query pattern where each child would otherwise
+      // trigger sequential database round-trips.
+      final results = await Future.wait(children.map((child) async {
+        // Parallelize internal fetches for each child
+        final results = await Future.wait([
+          _db.hasEnoughDataForInsights(child.id),
+          _db.getLast7DaysLogs(child.id),
+          _db.getTodayLogs(child.id),
+        ]);
+
+        final hasData = results[0] as bool;
+        final historicalLogs = results[1] as List<ActivityLogEntry>;
+        final todayLogs = results[2] as List<ActivityLogEntry>;
+
         // Convert database entries to ActivityLog model
         final historical = historicalLogs.map((e) => ActivityLog(
           id: e.id,
@@ -101,8 +104,19 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           historicalData: historical,
           todayData: today,
         );
-        
-        allInsights.addAll(childInsights);
+
+        return {
+          'hasData': hasData,
+          'insights': childInsights,
+        };
+      }));
+
+      final allInsights = <Insight>[];
+      bool hasAnyData = false;
+
+      for (final result in results) {
+        if (result['hasData'] as bool) hasAnyData = true;
+        allInsights.addAll(result['insights'] as List<Insight>);
       }
       
       // If no real insights generated, use demo insights
