@@ -66,17 +66,29 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
       final allInsights = <Insight>[];
       bool hasAnyData = false;
       
-      for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
+      // OPTIMIZATION (Bolt ⚡): Mitigate N+1 query pattern by parallelizing database fetches for all children.
+      // This reduces total IO wait time from O(N) to O(1) in terms of sequential roundtrips.
+      final results = await Future.wait(children.map((child) async {
+        final data = await Future.wait([
+          _db.hasEnoughDataForInsights(child.id),
+          _db.getLast7DaysLogs(child.id),
+          _db.getTodayLogs(child.id),
+        ]);
         
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
+        return _ChildDataBundle(
+          child: child,
+          hasEnoughData: data[0] as bool,
+          historicalLogs: data[1] as List<ActivityLogEntry>,
+          todayLogs: data[2] as List<ActivityLogEntry>,
+        );
+      }));
+
+      for (final bundle in results) {
+        final child = bundle.child;
+        if (bundle.hasEnoughData) hasAnyData = true;
         
         // Convert database entries to ActivityLog model
-        final historical = historicalLogs.map((e) => ActivityLog(
+        final historical = bundle.historicalLogs.map((e) => ActivityLog(
           id: e.id,
           childId: e.childId,
           screenTime: e.screenTime,
@@ -85,7 +97,7 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           appName: e.appName,
         )).toList();
         
-        final today = todayLogs.map((e) => ActivityLog(
+        final today = bundle.todayLogs.map((e) => ActivityLog(
           id: e.id,
           childId: e.childId,
           screenTime: e.screenTime,
@@ -229,6 +241,21 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return ActivityCategory.other;
     }
   }
+}
+
+/// Helper class to bundle child data for parallel processing
+class _ChildDataBundle {
+  final Child child;
+  final bool hasEnoughData;
+  final List<ActivityLogEntry> historicalLogs;
+  final List<ActivityLogEntry> todayLogs;
+
+  _ChildDataBundle({
+    required this.child,
+    required this.hasEnoughData,
+    required this.historicalLogs,
+    required this.todayLogs,
+  });
 }
 
 /// Provider for insights state

@@ -225,13 +225,15 @@ class FamilyOverviewScreen extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -0.5)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -0.5)),
+              const SizedBox(height: 4),
+              Text(subtitle, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+            ],
+          ),
         ),
         if (onAdd != null)
           ElevatedButton.icon(
@@ -348,13 +350,16 @@ class FamilyOverviewScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(status == 'Safe' ? Icons.check_circle_rounded : Icons.warning_rounded, size: 18, color: riskColor),
-                  const SizedBox(width: 6),
-                  Text(status, style: TextStyle(fontSize: 14, color: riskColor, fontWeight: FontWeight.w600)),
-                ],
+              Flexible(
+                child: Row(
+                  children: [
+                    Icon(status == 'Safe' ? Icons.check_circle_rounded : Icons.warning_rounded, size: 18, color: riskColor),
+                    const SizedBox(width: 6),
+                    Flexible(child: Text(status, style: TextStyle(fontSize: 14, color: riskColor, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Row(
                 children: [
                   Icon(Icons.access_time_rounded, size: 16, color: AppColors.textMuted),
