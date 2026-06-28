@@ -1,0 +1,3 @@
+## 2026-01-29 - [Optimized AI Insights Engine & N+1 Mitigation]
+**Learning:** Consolidating multiple O(N) traversals (filtering, mapping, folding) into a single-pass loop significantly reduces CPU overhead and memory allocations in data-heavy analytical services. Additionally, using `Future.wait` to parallelize database fetches across multiple entities mitigates the N+1 query pattern and improves perceived latency in state notifiers.
+**Action:** Always look for redundant traversals over the same data set in service layers and consolidate them into single-pass aggregations. Parallelize independent database/API calls within providers using `Future.wait`.
