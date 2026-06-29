@@ -7,7 +7,9 @@ import 'package:child_safety_monitor/utils/demo_data_generator.dart';
 
 /// Provider for AppDatabase instance
 final databaseProvider = Provider<AppDatabase>((ref) {
-  return AppDatabase();
+  final db = AppDatabase();
+  ref.onDispose(() => db.close());
+  return db;
 });
 
 /// State class for insights
@@ -65,16 +67,19 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
       
       final allInsights = <Insight>[];
       bool hasAnyData = false;
-      
-      for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
+
+      // Parallelize data fetching for all children to avoid sequential waterfall
+      final results = await Future.wait(children.map((child) async {
+        final hasDataFuture = _db.hasEnoughDataForInsights(child.id);
+        final historicalLogsFuture = _db.getLast7DaysLogs(child.id);
+        final todayLogsFuture = _db.getTodayLogs(child.id);
         
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
+        final values = await Future.wait([hasDataFuture, historicalLogsFuture, todayLogsFuture]);
         
+        final hasData = values[0] as bool;
+        final historicalLogs = values[1] as List<ActivityLogEntry>;
+        final todayLogs = values[2] as List<ActivityLogEntry>;
+
         // Convert database entries to ActivityLog model
         final historical = historicalLogs.map((e) => ActivityLog(
           id: e.id,
@@ -102,7 +107,15 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           todayData: today,
         );
         
-        allInsights.addAll(childInsights);
+        return {
+          'hasData': hasData,
+          'insights': childInsights,
+        };
+      }));
+
+      for (final result in results) {
+        if (result['hasData'] as bool) hasAnyData = true;
+        allInsights.addAll(result['insights'] as List<Insight>);
       }
       
       // If no real insights generated, use demo insights
