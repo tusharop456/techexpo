@@ -65,16 +65,21 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
       
       final allInsights = <Insight>[];
       bool hasAnyData = false;
-      
-      for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
+
+      // ⚡ BOLT OPTIMIZATION: Parallelize database fetches for all children
+      // Previously, this loop used 'await' sequentially, causing N * (3 database calls) latency.
+      // Using Future.wait allows us to fire all requests simultaneously.
+      final results = await Future.wait(children.map((child) async {
+        final dataFetching = await Future.wait([
+          _db.hasEnoughDataForInsights(child.id),
+          _db.getLast7DaysLogs(child.id),
+          _db.getTodayLogs(child.id),
+        ]);
+
+        final hasData = dataFetching[0] as bool;
+        final historicalLogs = dataFetching[1] as List<ActivityLogData>;
+        final todayLogs = dataFetching[2] as List<ActivityLogData>;
+
         // Convert database entries to ActivityLog model
         final historical = historicalLogs.map((e) => ActivityLog(
           id: e.id,
@@ -84,7 +89,7 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           category: _parseCategory(e.category),
           appName: e.appName,
         )).toList();
-        
+
         final today = todayLogs.map((e) => ActivityLog(
           id: e.id,
           childId: e.childId,
@@ -93,16 +98,21 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           category: _parseCategory(e.category),
           appName: e.appName,
         )).toList();
-        
-        // Generate insights using the engine
-        final childInsights = InsightsEngine.generateDailyInsights(
-          childId: child.id,
-          childName: child.name,
-          historicalData: historical,
-          todayData: today,
-        );
-        
-        allInsights.addAll(childInsights);
+
+        return {
+          'hasData': hasData,
+          'insights': InsightsEngine.generateDailyInsights(
+            childId: child.id,
+            childName: child.name,
+            historicalData: historical,
+            todayData: today,
+          ),
+        };
+      }));
+
+      for (final result in results) {
+        if (result['hasData'] as bool) hasAnyData = true;
+        allInsights.addAll(result['insights'] as List<Insight>);
       }
       
       // If no real insights generated, use demo insights
