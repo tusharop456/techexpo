@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-@DataClassName('Child')
+@DataClassName('ChildData')
 class Children extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
@@ -9,6 +9,32 @@ class Children extends Table {
   
   @override
   Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('BehavioralEventData')
+class BehavioralEvents extends Table {
+  TextColumn get id => text()();
+  TextColumn get childId => text().references(Children, #id)();
+  DateTimeColumn get timestamp => dateTime()();
+  IntColumn get durationSeconds => integer()();
+  IntColumn get interactionCount => integer()();
+  IntColumn get newKnownContacts => integer()();
+  IntColumn get unknownContacts => integer()();
+  TextColumn get appCategory => text()();
+  TextColumn get appName => text()();
+  TextColumn get deviceType => text()();
+  IntColumn get riskScore => integer()();
+  TextColumn get riskLevel => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class Todos extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text().withLength(min: 6, max: 32)();
+  TextColumn get content => text().named('body')();
+  IntColumn get category => integer().nullable()();
 }
 
 class Alerts extends Table {
@@ -26,7 +52,7 @@ class Alerts extends Table {
 }
 
 /// Activity Logs table for AI Insights Engine
-@DataClassName('ActivityLogEntry')
+@DataClassName('ActivityLogData')
 class ActivityLogs extends Table {
   TextColumn get id => text()();
   TextColumn get childId => text().references(Children, #id)();

@@ -10,7 +10,7 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 });
 
 // Provides a stream of all children
-final childrenStreamProvider = StreamProvider<List<Child>>((ref) {
+final childrenStreamProvider = StreamProvider<List<ChildData>>((ref) {
   return ref.watch(databaseProvider).watchChildren();
 });
 
