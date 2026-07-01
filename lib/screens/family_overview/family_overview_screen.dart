@@ -329,8 +329,8 @@ class FamilyOverviewScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(child.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                    Text(child.deviceName, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                    Text(child.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                    Text(child.deviceName, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -348,13 +348,16 @@ class FamilyOverviewScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(status == 'Safe' ? Icons.check_circle_rounded : Icons.warning_rounded, size: 18, color: riskColor),
-                  const SizedBox(width: 6),
-                  Text(status, style: TextStyle(fontSize: 14, color: riskColor, fontWeight: FontWeight.w600)),
-                ],
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(status == 'Safe' ? Icons.check_circle_rounded : Icons.warning_rounded, size: 18, color: riskColor),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text(status, style: TextStyle(fontSize: 14, color: riskColor, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Row(
                 children: [
                   Icon(Icons.access_time_rounded, size: 16, color: AppColors.textMuted),

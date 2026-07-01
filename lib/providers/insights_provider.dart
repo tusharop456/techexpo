@@ -63,18 +63,22 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      final allInsights = <Insight>[];
-      bool hasAnyData = false;
-      
-      for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
+      // BOLT OPTIMIZATION: Parallelize database fetches for all children
+      final results = await Future.wait(children.map((child) async {
+        final hasDataFuture = _db.hasEnoughDataForInsights(child.id);
+        final historicalLogsFuture = _db.getLast7DaysLogs(child.id);
+        final todayLogsFuture = _db.getTodayLogs(child.id);
+
+        final futures = await Future.wait([
+          hasDataFuture,
+          historicalLogsFuture,
+          todayLogsFuture,
+        ]);
+
+        final hasData = futures[0] as bool;
+        final historicalLogs = futures[1] as List<ActivityLogEntry>;
+        final todayLogs = futures[2] as List<ActivityLogEntry>;
+
         // Convert database entries to ActivityLog model
         final historical = historicalLogs.map((e) => ActivityLog(
           id: e.id,
@@ -101,8 +105,19 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           historicalData: historical,
           todayData: today,
         );
-        
-        allInsights.addAll(childInsights);
+
+        return {
+          'insights': childInsights,
+          'hasData': hasData,
+        };
+      }));
+
+      final allInsights = <Insight>[];
+      bool hasAnyData = false;
+
+      for (final result in results) {
+        allInsights.addAll(result['insights'] as List<Insight>);
+        if (result['hasData'] as bool) hasAnyData = true;
       }
       
       // If no real insights generated, use demo insights

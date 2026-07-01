@@ -1,5 +1,12 @@
 import 'package:drift/drift.dart';
 
+class Todos extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text().withLength(min: 6, max: 32)();
+  TextColumn get content => text().named('body')();
+  IntColumn get category => integer().nullable()();
+}
+
 @DataClassName('Child')
 class Children extends Table {
   TextColumn get id => text()();
@@ -7,6 +14,25 @@ class Children extends Table {
   IntColumn get riskLevel => integer().withDefault(const Constant(0))();
   DateTimeColumn get lastActive => dateTime().nullable()();
   
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('BehavioralEventData')
+class BehavioralEvents extends Table {
+  TextColumn get id => text()();
+  TextColumn get childId => text().references(Children, #id)();
+  DateTimeColumn get timestamp => dateTime()();
+  IntColumn get durationSeconds => integer()();
+  IntColumn get interactionCount => integer()();
+  IntColumn get newKnownContacts => integer()();
+  IntColumn get unknownContacts => integer()();
+  TextColumn get appCategory => text()();
+  TextColumn get appName => text()();
+  TextColumn get deviceType => text()();
+  IntColumn get riskScore => integer()();
+  TextColumn get riskLevel => text()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
