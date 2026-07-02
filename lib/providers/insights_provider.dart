@@ -63,17 +63,20 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      final allInsights = <Insight>[];
-      bool hasAnyData = false;
-      
-      for (final child in children) {
+      // OPTIMIZATION: Parallelize database fetches for each child using Future.wait
+      // This avoids sequential await calls in a loop, significantly reducing total load time
+      final insightsResults = await Future.wait(children.map((child) async {
         // Check if there's enough data
         final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
         
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
+        // Parallelize fetching historical and today's logs for this child
+        final results = await Future.wait([
+          _db.getLast7DaysLogs(child.id),
+          _db.getTodayLogs(child.id),
+        ]);
+
+        final historicalLogs = results[0];
+        final todayLogs = results[1];
         
         // Convert database entries to ActivityLog model
         final historical = historicalLogs.map((e) => ActivityLog(
@@ -102,7 +105,18 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           todayData: today,
         );
         
-        allInsights.addAll(childInsights);
+        return {
+          'insights': childInsights,
+          'hasData': hasData,
+        };
+      }));
+
+      final allInsights = <Insight>[];
+      bool hasAnyData = false;
+
+      for (final result in insightsResults) {
+        allInsights.addAll(result['insights'] as List<Insight>);
+        if (result['hasData'] as bool) hasAnyData = true;
       }
       
       // If no real insights generated, use demo insights
@@ -177,7 +191,6 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           }
         } catch (e) {
           // Gemini failed, continue with local insights
-          print('Gemini API failed: $e');
         }
       }
       

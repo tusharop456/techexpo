@@ -38,3 +38,22 @@ class ActivityLogs extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+@DataClassName('BehavioralEventData')
+class BehavioralEvents extends Table {
+  TextColumn get id => text()();
+  TextColumn get childId => text().references(Children, #id)();
+  DateTimeColumn get timestamp => dateTime()();
+  IntColumn get durationSeconds => integer()();
+  IntColumn get interactionCount => integer()();
+  IntColumn get newKnownContacts => integer()();
+  IntColumn get unknownContacts => integer()();
+  TextColumn get appCategory => text()();
+  TextColumn get appName => text()();
+  TextColumn get deviceType => text()();
+  IntColumn get riskScore => integer()();
+  TextColumn get riskLevel => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}

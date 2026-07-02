@@ -329,8 +329,8 @@ class FamilyOverviewScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(child.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                    Text(child.deviceName, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                    Text(child.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                    Text(child.deviceName, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -344,16 +344,17 @@ class FamilyOverviewScreen extends ConsumerWidget {
           const SizedBox(height: 20),
           Divider(height: 1, color: AppColors.glass),
           const SizedBox(height: 16),
-          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(status == 'Safe' ? Icons.check_circle_rounded : Icons.warning_rounded, size: 18, color: riskColor),
-                  const SizedBox(width: 6),
-                  Text(status, style: TextStyle(fontSize: 14, color: riskColor, fontWeight: FontWeight.w600)),
-                ],
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(status == 'Safe' ? Icons.check_circle_rounded : Icons.warning_rounded, size: 18, color: riskColor),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text(status, style: TextStyle(fontSize: 14, color: riskColor, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
               ),
               Row(
                 children: [
@@ -381,7 +382,7 @@ class FamilyOverviewScreen extends ConsumerWidget {
                         children: [
                           Icon(Icons.edit_outlined, size: 18, color: const Color(0xFF3B82F6)),
                           const SizedBox(width: 8),
-                          Text('Edit', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF3B82F6))),
+                          const Text('Edit', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF3B82F6))),
                         ],
                       ),
                     ),
@@ -403,7 +404,7 @@ class FamilyOverviewScreen extends ConsumerWidget {
                         children: [
                           Icon(Icons.delete_outline_rounded, size: 18, color: const Color(0xFFEF4444)),
                           const SizedBox(width: 8),
-                          Text('Remove', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFFEF4444))),
+                          const Text('Remove', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFFEF4444))),
                         ],
                       ),
                     ),
