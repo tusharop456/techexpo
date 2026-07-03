@@ -33,7 +33,7 @@ final unreadAlertCountProvider = FutureProvider<int>((ref) {
 });
 
 // Provider for average risk level
-final averageRiskProvider = FutureProvider<int>((ref) {
+final averageRiskProvider = FutureProvider<double>((ref) {
   return ref.watch(databaseProvider).getAverageRiskLevel();
 });
 

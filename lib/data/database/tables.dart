@@ -11,6 +11,19 @@ class Children extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+@DataClassName('BehavioralEventData')
+class BehavioralEvents extends Table {
+  TextColumn get id => text()();
+  TextColumn get childId => text().references(Children, #id)();
+  TextColumn get type => text()();
+  TextColumn get severity => text()();
+  TextColumn get description => text()();
+  DateTimeColumn get timestamp => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class Alerts extends Table {
   TextColumn get id => text()();
   TextColumn get childId => text().references(Children, #id)();
