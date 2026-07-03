@@ -63,38 +63,44 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      final allInsights = <Insight>[];
-      bool hasAnyData = false;
-      
-      for (final child in children) {
-        // Check if there's enough data
+      final results = await Future.wait(children.map((child) async {
         final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
         final historicalLogs = await _db.getLast7DaysLogs(child.id);
         final todayLogs = await _db.getTodayLogs(child.id);
         
-        // Convert database entries to ActivityLog model
-        final historical = historicalLogs.map((e) => ActivityLog(
-          id: e.id,
-          childId: e.childId,
-          screenTime: e.screenTime,
-          timestamp: e.timestamp,
-          category: _parseCategory(e.category),
-          appName: e.appName,
-        )).toList();
+        return {
+          'child': child,
+          'hasData': hasData,
+          'historical': historicalLogs.map((e) => ActivityLog(
+            id: e.id,
+            childId: e.childId,
+            screenTime: e.screenTime,
+            timestamp: e.timestamp,
+            category: _parseCategory(e.category),
+            appName: e.appName,
+          )).toList(),
+          'today': todayLogs.map((e) => ActivityLog(
+            id: e.id,
+            childId: e.childId,
+            screenTime: e.screenTime,
+            timestamp: e.timestamp,
+            category: _parseCategory(e.category),
+            appName: e.appName,
+          )).toList(),
+        };
+      }));
+
+      final allInsights = <Insight>[];
+      bool hasAnyData = false;
+
+      for (final result in results) {
+        final child = result['child'] as Child;
+        final hasData = result['hasData'] as bool;
+        final historical = result['historical'] as List<ActivityLog>;
+        final today = result['today'] as List<ActivityLog>;
         
-        final today = todayLogs.map((e) => ActivityLog(
-          id: e.id,
-          childId: e.childId,
-          screenTime: e.screenTime,
-          timestamp: e.timestamp,
-          category: _parseCategory(e.category),
-          appName: e.appName,
-        )).toList();
+        if (hasData) hasAnyData = true;
         
-        // Generate insights using the engine
         final childInsights = InsightsEngine.generateDailyInsights(
           childId: child.id,
           childName: child.name,
