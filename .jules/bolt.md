@@ -1,0 +1,3 @@
+## 2025-07-05 - Parallelized Database Fetches in InsightsNotifier
+**Learning:** In Flutter apps using Drift/SQLite, executing multiple independent database queries sequentially in a loop (N+1 pattern) for each item in a list (e.g., fetching logs for multiple children) creates significant wall-clock latency. Dart's `Future.wait` can parallelize these I/O operations, reducing latency to roughly the duration of the longest single query plus overhead.
+**Action:** Use `Future.wait` to batch independent database fetches within providers or notifiers, especially when processing collections of entities that each require supplementary data.

@@ -66,14 +66,30 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
       final allInsights = <Insight>[];
       bool hasAnyData = false;
       
-      for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
+      // OPTIMIZATION: Use Future.wait to parallelize database fetches for all children.
+      // This mitigates the N+1 query pattern where fetches were happening sequentially in a loop.
+      final results = await Future.wait(children.map((child) async {
+        final dataFetch = await Future.wait([
+          _db.hasEnoughDataForInsights(child.id),
+          _db.getLast7DaysLogs(child.id),
+          _db.getTodayLogs(child.id),
+        ]);
         
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
+        return {
+          'child': child,
+          'hasData': dataFetch[0] as bool,
+          'historicalLogs': dataFetch[1] as List<ActivityLogEntry>,
+          'todayLogs': dataFetch[2] as List<ActivityLogEntry>,
+        };
+      }));
+
+      for (final result in results) {
+        final child = result['child'] as Child;
+        final hasData = result['hasData'] as bool;
+        final historicalLogs = result['historicalLogs'] as List<ActivityLogEntry>;
+        final todayLogs = result['todayLogs'] as List<ActivityLogEntry>;
+
+        if (hasData) hasAnyData = true;
         
         // Convert database entries to ActivityLog model
         final historical = historicalLogs.map((e) => ActivityLog(
