@@ -63,18 +63,21 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      final allInsights = <Insight>[];
-      bool hasAnyData = false;
-      
-      for (final child in children) {
-        // Check if there's enough data
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
+      // ⚡ BOLT OPTIMIZATION: Parallelize data fetching for all children
+      // Instead of sequential 'await' calls in a loop (3N sequential calls),
+      // we use Future.wait to fetch data for all children in parallel.
+      // This significantly reduces the total I/O wait time, especially as the number of children grows.
+      final results = await Future.wait(children.map((child) async {
+        final data = await Future.wait([
+          _db.hasEnoughDataForInsights(child.id),
+          _db.getLast7DaysLogs(child.id),
+          _db.getTodayLogs(child.id),
+        ]);
+
+        final hasData = data[0] as bool;
+        final historicalLogs = data[1] as List<ActivityLogEntry>;
+        final todayLogs = data[2] as List<ActivityLogEntry>;
+
         // Convert database entries to ActivityLog model
         final historical = historicalLogs.map((e) => ActivityLog(
           id: e.id,
@@ -101,8 +104,16 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
           historicalData: historical,
           todayData: today,
         );
-        
-        allInsights.addAll(childInsights);
+
+        return _ChildDataResult(hasData, childInsights);
+      }));
+
+      final allInsights = <Insight>[];
+      bool hasAnyData = false;
+
+      for (final result in results) {
+        if (result.hasData) hasAnyData = true;
+        allInsights.addAll(result.insights);
       }
       
       // If no real insights generated, use demo insights
@@ -229,6 +240,13 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return ActivityCategory.other;
     }
   }
+}
+
+/// Private helper class to store parallelized results
+class _ChildDataResult {
+  final bool hasData;
+  final List<Insight> insights;
+  _ChildDataResult(this.hasData, this.insights);
 }
 
 /// Provider for insights state
