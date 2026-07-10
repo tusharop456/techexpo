@@ -63,45 +63,41 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      final allInsights = <Insight>[];
-      bool hasAnyData = false;
-      
-      for (final child in children) {
-        // Check if there's enough data
+      // BOLT OPTIMIZATION: Parallelize database fetches for all children
+      final results = await Future.wait(children.map((child) async {
         final hasData = await _db.hasEnoughDataForInsights(child.id);
-        if (hasData) hasAnyData = true;
-        
-        // Get historical and today's logs
         final historicalLogs = await _db.getLast7DaysLogs(child.id);
         final todayLogs = await _db.getTodayLogs(child.id);
         
-        // Convert database entries to ActivityLog model
-        final historical = historicalLogs.map((e) => ActivityLog(
-          id: e.id,
-          childId: e.childId,
-          screenTime: e.screenTime,
-          timestamp: e.timestamp,
-          category: _parseCategory(e.category),
-          appName: e.appName,
-        )).toList();
-        
-        final today = todayLogs.map((e) => ActivityLog(
-          id: e.id,
-          childId: e.childId,
-          screenTime: e.screenTime,
-          timestamp: e.timestamp,
-          category: _parseCategory(e.category),
-          appName: e.appName,
-        )).toList();
-        
-        // Generate insights using the engine
-        final childInsights = InsightsEngine.generateDailyInsights(
+        return _ChildData(
           childId: child.id,
           childName: child.name,
-          historicalData: historical,
-          todayData: today,
+          hasData: hasData,
+          historical: historicalLogs.map((e) => ActivityLog(
+            id: e.id, childId: e.childId, screenTime: e.screenTime,
+            timestamp: e.timestamp, category: _parseCategory(e.category),
+            appName: e.appName,
+          )).toList(),
+          today: todayLogs.map((e) => ActivityLog(
+            id: e.id, childId: e.childId, screenTime: e.screenTime,
+            timestamp: e.timestamp, category: _parseCategory(e.category),
+            appName: e.appName,
+          )).toList(),
         );
+      }));
+
+      final allInsights = <Insight>[];
+      bool hasAnyData = false;
+
+      for (final data in results) {
+        if (data.hasData) hasAnyData = true;
         
+        final childInsights = InsightsEngine.generateDailyInsights(
+          childId: data.childId,
+          childName: data.childName,
+          historicalData: data.historical,
+          todayData: data.today,
+        );
         allInsights.addAll(childInsights);
       }
       
@@ -236,6 +232,23 @@ final insightsProvider = StateNotifierProvider<InsightsNotifier, InsightsState>(
   final db = ref.watch(databaseProvider);
   return InsightsNotifier(db);
 });
+
+/// BOLT: Helper class for parallelized data fetching
+class _ChildData {
+  final String childId;
+  final String childName;
+  final bool hasData;
+  final List<ActivityLog> historical;
+  final List<ActivityLog> today;
+
+  _ChildData({
+    required this.childId,
+    required this.childName,
+    required this.hasData,
+    required this.historical,
+    required this.today,
+  });
+}
 
 /// Provider for just the insights list
 final insightsListProvider = Provider<List<Insight>>((ref) {
