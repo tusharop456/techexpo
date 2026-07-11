@@ -60,9 +60,14 @@ class AppDatabase extends _$AppDatabase {
 
   // Activity Logs
   Future<List<ActivityLogEntry>> getLast7DaysLogs(String childId) {
+    return getAllLast7DaysLogs([childId]);
+  }
+
+  /// BOLT: Batch fetch logs for multiple children to prevent N+1 queries
+  Future<List<ActivityLogEntry>> getAllLast7DaysLogs(List<String> childIds) {
     final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
     return (select(activityLogs)
-      ..where((t) => t.childId.equals(childId))
+      ..where((t) => t.childId.isIn(childIds))
       ..where((t) => t.timestamp.isBiggerThanValue(sevenDaysAgo)))
       .get();
   }
@@ -77,13 +82,28 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<bool> hasEnoughDataForInsights(String childId) async {
+    final statusMap = await getManyHasEnoughData([childId]);
+    return statusMap[childId] ?? false;
+  }
+
+  /// BOLT: Batch check insight eligibility using GROUP BY to prevent N+1 queries
+  Future<Map<String, bool>> getManyHasEnoughData(List<String> childIds) async {
     final countExp = activityLogs.id.count();
     final query = selectOnly(activityLogs)
-      ..addColumns([countExp])
-      ..where(activityLogs.childId.equals(childId));
-    final result = await query.getSingle();
-    final count = result.read(countExp) ?? 0;
-    return count >= 10; // Threshold for insights
+      ..addColumns([activityLogs.childId, countExp])
+      ..where(activityLogs.childId.isIn(childIds))
+      ..groupBy([activityLogs.childId]);
+
+    final results = await query.get();
+
+    final statusMap = <String, bool>{};
+    for (final row in results) {
+      final id = row.read(activityLogs.childId);
+      final count = row.read(countExp) ?? 0;
+      if (id != null) statusMap[id] = count >= 10;
+    }
+
+    return statusMap;
   }
 }
 
