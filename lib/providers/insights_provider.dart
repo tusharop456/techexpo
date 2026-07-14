@@ -50,10 +50,10 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
   /// Load insights from database
   Future<void> loadInsights() async {
     state = state.copyWith(isLoading: true);
-    
+
     try {
       final children = await _db.getAllChildren();
-      
+
       if (children.isEmpty) {
         state = state.copyWith(
           insights: [],
@@ -62,41 +62,51 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         );
         return;
       }
-      
-      // BOLT OPTIMIZATION: Parallelize database fetches for all children
-      final results = await Future.wait(children.map((child) async {
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
-        return _ChildData(
-          childId: child.id,
-          childName: child.name,
-          hasData: hasData,
-          historical: historicalLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
-          today: todayLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
+
+      final childIds = children.map((c) => c.id).toList();
+
+      // BOLT OPTIMIZATION: Batch database fetches - 2 round trips instead of 3N
+      final results = await Future.wait([
+        _db.getManyHasEnoughData(childIds),
+        _db.getAllLast7DaysLogs(childIds),
+      ]);
+
+      final enoughDataChildIds = results[0] as Set<String>;
+      final allLogs = results[1] as List<ActivityLogEntry>;
+
+      final now = DateTime.now();
+      final startOfToday = DateTime(now.year, now.month, now.day);
+
+      // BOLT OPTIMIZATION: Single-pass partitioning of logs by child and today/historical
+      final historicalByChild = <String, List<ActivityLog>>{};
+      final todayByChild = <String, List<ActivityLog>>{};
+
+      for (final entry in allLogs) {
+        final log = ActivityLog(
+          id: entry.id,
+          childId: entry.childId,
+          screenTime: entry.screenTime,
+          timestamp: entry.timestamp,
+          category: _parseCategory(entry.category),
+          appName: entry.appName,
         );
-      }));
+
+        if (entry.timestamp.isAfter(startOfToday) ||
+            entry.timestamp.isAtSameMomentAs(startOfToday)) {
+          todayByChild.putIfAbsent(entry.childId, () => []).add(log);
+        }
+        historicalByChild.putIfAbsent(entry.childId, () => []).add(log);
+      }
 
       final allInsights = <Insight>[];
-      bool hasAnyData = false;
+      bool hasAnyData = enoughDataChildIds.isNotEmpty;
 
-      for (final data in results) {
-        if (data.hasData) hasAnyData = true;
-        
+      for (final child in children) {
         final childInsights = InsightsEngine.generateDailyInsights(
-          childId: data.childId,
-          childName: data.childName,
-          historicalData: data.historical,
-          todayData: data.today,
+          childId: child.id,
+          childName: child.name,
+          historicalData: historicalByChild[child.id] ?? [],
+          todayData: todayByChild[child.id] ?? [],
         );
         allInsights.addAll(childInsights);
       }
@@ -232,23 +242,6 @@ final insightsProvider = StateNotifierProvider<InsightsNotifier, InsightsState>(
   final db = ref.watch(databaseProvider);
   return InsightsNotifier(db);
 });
-
-/// BOLT: Helper class for parallelized data fetching
-class _ChildData {
-  final String childId;
-  final String childName;
-  final bool hasData;
-  final List<ActivityLog> historical;
-  final List<ActivityLog> today;
-
-  _ChildData({
-    required this.childId,
-    required this.childName,
-    required this.hasData,
-    required this.historical,
-    required this.today,
-  });
-}
 
 /// Provider for just the insights list
 final insightsListProvider = Provider<List<Insight>>((ref) {
