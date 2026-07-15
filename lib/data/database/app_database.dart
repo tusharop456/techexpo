@@ -85,6 +85,37 @@ class AppDatabase extends _$AppDatabase {
     final count = result.read(countExp) ?? 0;
     return count >= 10; // Threshold for insights
   }
+
+  // BOLT OPTIMIZATION: Batch query for multiple children to avoid N+1
+  Future<List<ActivityLogEntry>> getAllLast7DaysLogs(List<String> childIds) {
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    return (select(activityLogs)
+      ..where((t) => t.childId.isIn(childIds))
+      ..where((t) => t.timestamp.isBiggerThanValue(sevenDaysAgo)))
+      .get();
+  }
+
+  // BOLT OPTIMIZATION: Batch count check for multiple children
+  Future<Map<String, bool>> getManyHasEnoughData(List<String> childIds) async {
+    final countExp = activityLogs.id.count();
+    final query = selectOnly(activityLogs)
+      ..addColumns([activityLogs.childId, countExp])
+      ..where(activityLogs.childId.isIn(childIds))
+      ..groupBy([activityLogs.childId]);
+
+    final results = await query.get();
+    final resultMap = {for (var id in childIds) id: false};
+
+    for (final row in results) {
+      final id = row.read(activityLogs.childId);
+      if (id != null) {
+        final count = row.read(countExp) ?? 0;
+        resultMap[id] = count >= 10;
+      }
+    }
+
+    return resultMap;
+  }
 }
 
 LazyDatabase _openConnection() {
