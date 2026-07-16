@@ -63,40 +63,56 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      // BOLT OPTIMIZATION: Parallelize database fetches for all children
-      final results = await Future.wait(children.map((child) async {
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
-        return _ChildData(
-          childId: child.id,
-          childName: child.name,
-          hasData: hasData,
-          historical: historicalLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
-          today: todayLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
+      // BOLT OPTIMIZATION: Batch database queries to reduce round-trips (3 total)
+      final childIds = children.map((c) => c.id).toList();
+      final today = DateTime.now();
+      final startOfToday = DateTime(today.year, today.month, today.day);
+
+      // 1. Fetch all relevant data in parallel batches
+      final batchResults = await Future.wait([
+        _db.getManyHasEnoughData(childIds),
+        _db.getAllLast7DaysLogs(childIds),
+      ]);
+
+      final hasDataMap = batchResults[0] as Set<String>;
+      final allLogs = batchResults[1] as List<ActivityLogEntry>;
+
+      // 2. Partition logs by childId and split into today/historical in memory
+      final logsByChild = <String, List<ActivityLog>>{};
+      for (final e in allLogs) {
+        final log = ActivityLog(
+          id: e.id,
+          childId: e.childId,
+          screenTime: e.screenTime,
+          timestamp: e.timestamp,
+          category: _parseCategory(e.category),
+          appName: e.appName,
         );
-      }));
+        logsByChild.putIfAbsent(log.childId, () => []).add(log);
+      }
 
       final allInsights = <Insight>[];
-      bool hasAnyData = false;
+      bool hasAnyData = hasDataMap.isNotEmpty;
 
-      for (final data in results) {
-        if (data.hasData) hasAnyData = true;
-        
+      // 3. Process insights for each child using partitioned data
+      for (final child in children) {
+        final childLogs = logsByChild[child.id] ?? [];
+        final historical = <ActivityLog>[];
+        final todayLogs = <ActivityLog>[];
+
+        for (final log in childLogs) {
+          if (log.timestamp.isAfter(startOfToday)) {
+            todayLogs.add(log);
+          } else {
+            historical.add(log);
+          }
+        }
+
         final childInsights = InsightsEngine.generateDailyInsights(
-          childId: data.childId,
-          childName: data.childName,
-          historicalData: data.historical,
-          todayData: data.today,
+          childId: child.id,
+          childName: child.name,
+          historicalData: historical,
+          todayData: todayLogs,
         );
         allInsights.addAll(childInsights);
       }
@@ -232,23 +248,6 @@ final insightsProvider = StateNotifierProvider<InsightsNotifier, InsightsState>(
   final db = ref.watch(databaseProvider);
   return InsightsNotifier(db);
 });
-
-/// BOLT: Helper class for parallelized data fetching
-class _ChildData {
-  final String childId;
-  final String childName;
-  final bool hasData;
-  final List<ActivityLog> historical;
-  final List<ActivityLog> today;
-
-  _ChildData({
-    required this.childId,
-    required this.childName,
-    required this.hasData,
-    required this.historical,
-    required this.today,
-  });
-}
 
 /// Provider for just the insights list
 final insightsListProvider = Provider<List<Insight>>((ref) {
