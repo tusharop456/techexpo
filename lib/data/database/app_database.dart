@@ -60,30 +60,45 @@ class AppDatabase extends _$AppDatabase {
 
   // Activity Logs
   Future<List<ActivityLogEntry>> getLast7DaysLogs(String childId) {
+    return getAllLast7DaysLogs([childId]);
+  }
+
+  /// BOLT OPTIMIZATION: Batch fetch logs for multiple children
+  Future<List<ActivityLogEntry>> getAllLast7DaysLogs(List<String> childIds) {
     final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
     return (select(activityLogs)
-      ..where((t) => t.childId.equals(childId))
-      ..where((t) => t.timestamp.isBiggerThanValue(sevenDaysAgo)))
-      .get();
+          ..where((t) => t.childId.isIn(childIds))
+          ..where((t) => t.timestamp.isBiggerThanValue(sevenDaysAgo)))
+        .get();
   }
 
   Future<List<ActivityLogEntry>> getTodayLogs(String childId) {
     final today = DateTime.now();
     final startOfToday = DateTime(today.year, today.month, today.day);
     return (select(activityLogs)
-      ..where((t) => t.childId.equals(childId))
-      ..where((t) => t.timestamp.isBiggerThanValue(startOfToday)))
-      .get();
+          ..where((t) => t.childId.equals(childId))
+          ..where((t) => t.timestamp.isBiggerThanValue(startOfToday)))
+        .get();
   }
 
   Future<bool> hasEnoughDataForInsights(String childId) async {
+    final results = await getManyHasEnoughData([childId]);
+    return results.contains(childId);
+  }
+
+  /// BOLT OPTIMIZATION: Batch check data thresholds for multiple children
+  Future<Set<String>> getManyHasEnoughData(List<String> childIds) async {
     final countExp = activityLogs.id.count();
     final query = selectOnly(activityLogs)
-      ..addColumns([countExp])
-      ..where(activityLogs.childId.equals(childId));
-    final result = await query.getSingle();
-    final count = result.read(countExp) ?? 0;
-    return count >= 10; // Threshold for insights
+      ..addColumns([activityLogs.childId, countExp])
+      ..where(activityLogs.childId.isIn(childIds))
+      ..groupBy([activityLogs.childId]);
+
+    final results = await query.get();
+    return results
+        .where((row) => (row.read(countExp) ?? 0) >= 10)
+        .map((row) => row.read(activityLogs.childId)!)
+        .toSet();
   }
 }
 
