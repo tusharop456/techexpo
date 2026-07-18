@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-10 - Redundant List Traversals in UI Views
+**Learning:** Multiple linear list traversals (via `.where` or `.toList`) in Flutter widget build methods cause redundant iteration of list elements on every frame rebuild.
+**Action:** Consolidate multiple filter/where calls in UI rendering methods into a single-pass O(N) loop to group items and compute counts.
