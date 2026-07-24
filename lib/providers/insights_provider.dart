@@ -63,28 +63,57 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      // BOLT OPTIMIZATION: Parallelize database fetches for all children
-      final results = await Future.wait(children.map((child) async {
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
+      // BOLT OPTIMIZATION: Batch queries across all children in parallel
+      final childIds = children.map((c) => c.id).toList();
+      final batchResults = await Future.wait([
+        _db.getManyHasEnoughData(childIds),
+        _db.getAllLast7DaysLogs(childIds),
+      ]);
+
+      final hasEnoughDataMap = batchResults[0] as Map<String, bool>;
+      final allLogs = batchResults[1] as List<ActivityLogEntry>;
+
+      // O(M) in-memory grouping and partitioning of logs by child and day
+      final logsByChild = <String, List<ActivityLogEntry>>{
+        for (final id in childIds) id: [],
+      };
+      for (final log in allLogs) {
+        logsByChild[log.childId]?.add(log);
+      }
+
+      final now = DateTime.now();
+      final startOfToday = DateTime(now.year, now.month, now.day);
+
+      final results = children.map((child) {
+        final hasData = hasEnoughDataMap[child.id] ?? false;
+        final childLogs = logsByChild[child.id] ?? [];
         
+        final historical = <ActivityLog>[];
+        final today = <ActivityLog>[];
+
+        for (final e in childLogs) {
+          final mappedLog = ActivityLog(
+            id: e.id,
+            childId: e.childId,
+            screenTime: e.screenTime,
+            timestamp: e.timestamp,
+            category: _parseCategory(e.category),
+            appName: e.appName,
+          );
+          historical.add(mappedLog);
+          if (e.timestamp.isAfter(startOfToday) || e.timestamp.isAtSameMomentAs(startOfToday)) {
+            today.add(mappedLog);
+          }
+        }
+
         return _ChildData(
           childId: child.id,
           childName: child.name,
           hasData: hasData,
-          historical: historicalLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
-          today: todayLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
+          historical: historical,
+          today: today,
         );
-      }));
+      }).toList();
 
       final allInsights = <Insight>[];
       bool hasAnyData = false;
