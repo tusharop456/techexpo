@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-11 - Single-pass UI List Partitioning and Counts
+**Learning:** Chaining multiple separate `.where` traversals inside build or UI methods for counting/filtering lists can scale poorly and waste CPU cycles.
+**Action:** Consolidate multiple separate collection linear scans inside widget build methods into a single O(N) loop that computes counts and partitions sublists concurrently.
