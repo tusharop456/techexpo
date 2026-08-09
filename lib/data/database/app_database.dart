@@ -10,7 +10,7 @@ part 'app_database.g.dart';
 
 @DriftDatabase(tables: [Children, Alerts, ActivityLogs, BehavioralEvents, Todos])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
   int get schemaVersion => 1;
@@ -84,6 +84,39 @@ class AppDatabase extends _$AppDatabase {
     final result = await query.getSingle();
     final count = result.read(countExp) ?? 0;
     return count >= 10; // Threshold for insights
+  }
+
+  // BOLT OPTIMIZATION: Batch query to check data sufficiency for multiple children in a single DB round-trip
+  Future<Map<String, bool>> getManyHasEnoughData(List<String> childIds) async {
+    if (childIds.isEmpty) return {};
+
+    final countExp = activityLogs.id.count();
+    final query = selectOnly(activityLogs)
+      ..addColumns([activityLogs.childId, countExp])
+      ..where(activityLogs.childId.isIn(childIds))
+      ..groupBy([activityLogs.childId]);
+
+    final results = await query.get();
+
+    final Map<String, bool> resultMap = {for (var id in childIds) id: false};
+    for (final row in results) {
+      final childId = row.read(activityLogs.childId);
+      final count = row.read(countExp) ?? 0;
+      if (childId != null) {
+        resultMap[childId] = count >= 10;
+      }
+    }
+    return resultMap;
+  }
+
+  // BOLT OPTIMIZATION: Batch query to get 7 days logs for multiple children in a single DB round-trip
+  Future<List<ActivityLogEntry>> getAllLast7DaysLogs(List<String> childIds) {
+    if (childIds.isEmpty) return Future.value([]);
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    return (select(activityLogs)
+      ..where((t) => t.childId.isIn(childIds))
+      ..where((t) => t.timestamp.isBiggerThanValue(sevenDaysAgo)))
+      .get();
   }
 }
 
