@@ -10,7 +10,7 @@ part 'app_database.g.dart';
 
 @DriftDatabase(tables: [Children, Alerts, ActivityLogs, BehavioralEvents, Todos])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
   int get schemaVersion => 1;
@@ -84,6 +84,41 @@ class AppDatabase extends _$AppDatabase {
     final result = await query.getSingle();
     final count = result.read(countExp) ?? 0;
     return count >= 10; // Threshold for insights
+  }
+
+  // Batch Activity Logs Retrieval
+  Future<List<ActivityLogEntry>> getAllLast7DaysLogs(List<String> childIds) {
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    return (select(activityLogs)
+      ..where((t) => t.childId.isIn(childIds))
+      ..where((t) => t.timestamp.isBiggerThanValue(sevenDaysAgo)))
+      .get();
+  }
+
+  // Batch Insight Threshold Status Checking
+  Future<Map<String, bool>> getManyHasEnoughData(List<String> childIds) async {
+    final countExp = activityLogs.id.count();
+    final query = selectOnly(activityLogs)
+      ..addColumns([activityLogs.childId, countExp])
+      ..where(activityLogs.childId.isIn(childIds))
+      ..groupBy([activityLogs.childId]);
+
+    final results = await query.get();
+
+    final map = <String, bool>{};
+    for (final row in results) {
+      final childId = row.read(activityLogs.childId);
+      final count = row.read(countExp) ?? 0;
+      if (childId != null) {
+        map[childId] = count >= 10;
+      }
+    }
+
+    // Default false for any children that didn't have logs in the db
+    for (final id in childIds) {
+      map.putIfAbsent(id, () => false);
+    }
+    return map;
   }
 }
 
