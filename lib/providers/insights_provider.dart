@@ -67,22 +67,29 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
       final results = await Future.wait(children.map((child) async {
         final hasData = await _db.hasEnoughDataForInsights(child.id);
         final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
+
+        final mappedHistorical = historicalLogs.map((e) => ActivityLog(
+          id: e.id,
+          childId: e.childId,
+          screenTime: e.screenTime,
+          timestamp: e.timestamp,
+          category: _parseCategory(e.category),
+          appName: e.appName,
+        )).toList();
+
+        // BOLT: Filter today's logs in memory from the last 7 days logs to save a database round-trip
+        final now = DateTime.now();
+        final startOfToday = DateTime(now.year, now.month, now.day);
+        final mappedToday = mappedHistorical.where((log) {
+          return log.timestamp.isAfter(startOfToday) || log.timestamp.isAtSameMomentAs(startOfToday);
+        }).toList();
         
         return _ChildData(
           childId: child.id,
           childName: child.name,
           hasData: hasData,
-          historical: historicalLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
-          today: todayLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
+          historical: mappedHistorical,
+          today: mappedToday,
         );
       }));
 
