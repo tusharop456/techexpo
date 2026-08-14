@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-11 - Single-pass UI List Partitioning in Alerts Screen
+**Learning:** Found that the AlertsScreen was performing five separate linear O(N) traversals (using `.where` filters) on the list of alerts during build time to calculate badges and partition lists. Consolidating this into a single-pass O(N) loop dramatically improves build rendering performance and avoids redundant filter iterations.
+**Action:** In widgets displaying filtered tab views or counts from a shared dataset, perform a single-pass iteration in the build method to partition list subsets and aggregate counts.
