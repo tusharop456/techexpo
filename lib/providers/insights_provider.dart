@@ -63,26 +63,38 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      // BOLT OPTIMIZATION: Parallelize database fetches for all children
+      // BOLT OPTIMIZATION: Single DB query for last 7 days; partition today's logs in-memory in Dart
+      final now = DateTime.now();
+      final startOfToday = DateTime(now.year, now.month, now.day);
+
       final results = await Future.wait(children.map((child) async {
         final hasData = await _db.hasEnoughDataForInsights(child.id);
         final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
+
+        final historical = <ActivityLog>[];
+        final today = <ActivityLog>[];
+
+        for (final e in historicalLogs) {
+          final log = ActivityLog(
+            id: e.id,
+            childId: e.childId,
+            screenTime: e.screenTime,
+            timestamp: e.timestamp,
+            category: _parseCategory(e.category),
+            appName: e.appName,
+          );
+          historical.add(log);
+          if (!e.timestamp.isBefore(startOfToday)) {
+            today.add(log);
+          }
+        }
+
         return _ChildData(
           childId: child.id,
           childName: child.name,
           hasData: hasData,
-          historical: historicalLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
-          today: todayLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
+          historical: historical,
+          today: today,
         );
       }));
 
