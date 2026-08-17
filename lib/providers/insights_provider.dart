@@ -63,26 +63,42 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      // BOLT OPTIMIZATION: Parallelize database fetches for all children
+      final now = DateTime.now();
+      final startOfToday = DateTime(now.year, now.month, now.day);
+
+      // BOLT OPTIMIZATION: Parallelize DB calls per child and eliminate redundant getTodayLogs query
+      // by partitioning historical 7-day logs in memory in a single traversal.
       final results = await Future.wait(children.map((child) async {
-        final hasData = await _db.hasEnoughDataForInsights(child.id);
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
+        final hasDataFuture = _db.hasEnoughDataForInsights(child.id);
+        final historicalLogsFuture = _db.getLast7DaysLogs(child.id);
+
+        final hasData = await hasDataFuture;
+        final rawLogs = await historicalLogsFuture;
+
+        final historical = <ActivityLog>[];
+        final today = <ActivityLog>[];
+
+        for (final e in rawLogs) {
+          final log = ActivityLog(
+            id: e.id,
+            childId: e.childId,
+            screenTime: e.screenTime,
+            timestamp: e.timestamp,
+            category: _parseCategory(e.category),
+            appName: e.appName,
+          );
+          historical.add(log);
+          if (e.timestamp.isAfter(startOfToday) || e.timestamp.isAtSameMomentAs(startOfToday)) {
+            today.add(log);
+          }
+        }
         
         return _ChildData(
           childId: child.id,
           childName: child.name,
           hasData: hasData,
-          historical: historicalLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
-          today: todayLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
+          historical: historical,
+          today: today,
         );
       }));
 
