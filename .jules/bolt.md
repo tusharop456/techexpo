@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-10 - Eliminate Redundant Today Database Query
+**Learning:** Fetching both historical (last 7 days) logs and today's logs separately from SQLite results in duplicate query executions, since today's logs are a subset of the last 7 days' logs.
+**Action:** Fetch last 7 days of logs once and partition today's logs in memory in Dart.
