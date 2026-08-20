@@ -63,26 +63,32 @@ class InsightsNotifier extends StateNotifier<InsightsState> {
         return;
       }
       
-      // BOLT OPTIMIZATION: Parallelize database fetches for all children
+      // BOLT OPTIMIZATION: Parallelize database fetches and derive today's logs from
+      // historical 7-day logs in memory to eliminate redundant database queries per child.
+      final now = DateTime.now();
+      final startOfToday = DateTime(now.year, now.month, now.day);
+
       final results = await Future.wait(children.map((child) async {
         final hasData = await _db.hasEnoughDataForInsights(child.id);
-        final historicalLogs = await _db.getLast7DaysLogs(child.id);
-        final todayLogs = await _db.getTodayLogs(child.id);
-        
+        final historicalEntries = await _db.getLast7DaysLogs(child.id);
+
+        final historical = historicalEntries.map((e) => ActivityLog(
+          id: e.id, childId: e.childId, screenTime: e.screenTime,
+          timestamp: e.timestamp, category: _parseCategory(e.category),
+          appName: e.appName,
+        )).toList();
+
+        // Today's logs are a subset of the last 7 days logs; filter in Dart memory
+        final today = historical
+            .where((log) => log.timestamp.isAfter(startOfToday))
+            .toList();
+
         return _ChildData(
           childId: child.id,
           childName: child.name,
           hasData: hasData,
-          historical: historicalLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
-          today: todayLogs.map((e) => ActivityLog(
-            id: e.id, childId: e.childId, screenTime: e.screenTime,
-            timestamp: e.timestamp, category: _parseCategory(e.category),
-            appName: e.appName,
-          )).toList(),
+          historical: historical,
+          today: today,
         );
       }));
 

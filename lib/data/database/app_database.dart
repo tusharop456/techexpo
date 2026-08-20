@@ -11,6 +11,7 @@ part 'app_database.g.dart';
 @DriftDatabase(tables: [Children, Alerts, ActivityLogs, BehavioralEvents, Todos])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+  AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
   int get schemaVersion => 1;
