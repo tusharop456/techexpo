@@ -86,6 +86,43 @@ class AppDatabase extends _$AppDatabase {
     final count = result.read(countExp) ?? 0;
     return count >= 10; // Threshold for insights
   }
+
+  /// BOLT OPTIMIZATION: Batch query to fetch all activity logs within the last 7 days
+  /// for a list of child IDs in a single database round-trip.
+  Future<List<ActivityLogEntry>> getAllLast7DaysLogs(List<String> childIds) {
+    if (childIds.isEmpty) return Future.value([]);
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    return (select(activityLogs)
+      ..where((t) => t.childId.isIn(childIds))
+      ..where((t) => t.timestamp.isBiggerThanValue(sevenDaysAgo)))
+      .get();
+  }
+
+  /// BOLT OPTIMIZATION: Batch query to check whether multiple children have enough data
+  /// for insights in a single database round-trip using GROUP BY.
+  Future<Map<String, bool>> getManyHasEnoughData(List<String> childIds) async {
+    if (childIds.isEmpty) return {};
+    final countExp = activityLogs.id.count();
+    final query = selectOnly(activityLogs)
+      ..addColumns([activityLogs.childId, countExp])
+      ..where(activityLogs.childId.isIn(childIds))
+      ..groupBy([activityLogs.childId]);
+
+    final rows = await query.get();
+    final resultMap = <String, bool>{
+      for (final id in childIds) id: false,
+    };
+
+    for (final row in rows) {
+      final childId = row.read(activityLogs.childId);
+      final count = row.read(countExp) ?? 0;
+      if (childId != null) {
+        resultMap[childId] = count >= 10;
+      }
+    }
+
+    return resultMap;
+  }
 }
 
 LazyDatabase _openConnection() {
