@@ -86,6 +86,37 @@ class AppDatabase extends _$AppDatabase {
     final count = result.read(countExp) ?? 0;
     return count >= 10; // Threshold for insights
   }
+
+  Future<Map<String, bool>> getManyHasEnoughData(List<String> childIds) async {
+    if (childIds.isEmpty) return {};
+    final countExp = activityLogs.id.count();
+    final query = selectOnly(activityLogs)
+      ..addColumns([activityLogs.childId, countExp])
+      ..where(activityLogs.childId.isIn(childIds))
+      ..groupBy([activityLogs.childId]);
+
+    final rows = await query.get();
+    final resultMap = <String, bool>{
+      for (final id in childIds) id: false,
+    };
+    for (final row in rows) {
+      final id = row.read(activityLogs.childId);
+      final count = row.read(countExp) ?? 0;
+      if (id != null) {
+        resultMap[id] = count >= 10;
+      }
+    }
+    return resultMap;
+  }
+
+  Future<List<ActivityLogEntry>> getAllLast7DaysLogs(List<String> childIds) {
+    if (childIds.isEmpty) return Future.value([]);
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    return (select(activityLogs)
+      ..where((t) => t.childId.isIn(childIds))
+      ..where((t) => t.timestamp.isBiggerThanValue(sevenDaysAgo)))
+      .get();
+  }
 }
 
 LazyDatabase _openConnection() {
