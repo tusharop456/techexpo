@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
@@ -68,8 +69,8 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
   }
 }
 
-/// StaggeredList - Automatically staggers children animations
-class StaggeredList extends StatelessWidget {
+/// StaggeredList - Automatically staggers children animations using a single controller
+class StaggeredList extends StatefulWidget {
   final List<Widget> children;
   final Duration itemDelay;
   final Duration itemDuration;
@@ -84,17 +85,87 @@ class StaggeredList extends StatelessWidget {
   });
 
   @override
+  State<StaggeredList> createState() => _StaggeredListState();
+}
+
+class _StaggeredListState extends State<StaggeredList> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  int _calculateTotalDurationMs() {
+    final count = widget.children.length;
+    if (count == 0) return 0;
+    return max(1, widget.itemDuration.inMilliseconds + (count - 1) * widget.itemDelay.inMilliseconds);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: _calculateTotalDurationMs()),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(StaggeredList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.children.length != oldWidget.children.length ||
+        widget.itemDelay != oldWidget.itemDelay ||
+        widget.itemDuration != oldWidget.itemDuration) {
+      _controller.duration = Duration(milliseconds: _calculateTotalDurationMs());
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(children.length, (index) {
-        return FadeSlideIn(
-          delay: Duration(milliseconds: itemDelay.inMilliseconds * index),
-          duration: itemDuration,
-          offsetY: offsetY,
-          child: children[index],
+    final count = widget.children.length;
+    if (count == 0) return const Column(children: []);
+
+    final totalMs = _controller.duration?.inMilliseconds ?? 0;
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final progress = _controller.value;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(count, (index) {
+            if (totalMs <= 0) {
+              return widget.children[index];
+            }
+
+            final startMs = index * widget.itemDelay.inMilliseconds;
+            final endMs = startMs + widget.itemDuration.inMilliseconds;
+
+            final startFraction = (startMs / totalMs).clamp(0.0, 1.0);
+            final endFraction = max(startFraction + 0.0001, (endMs / totalMs).clamp(0.0, 1.0));
+
+            // Compute curve directly using Interval.transform without allocating CurvedAnimation on every frame
+            final animValue = const Interval(0, 1, curve: Curves.easeOutCubic).transform(
+              ((progress - startFraction) / (endFraction - startFraction)).clamp(0.0, 1.0),
+            );
+
+            final opacity = animValue;
+            final currentOffsetY = widget.offsetY * (1.0 - animValue);
+
+            return Opacity(
+              opacity: opacity,
+              child: Transform.translate(
+                offset: Offset(0, currentOffsetY),
+                child: widget.children[index],
+              ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 }
