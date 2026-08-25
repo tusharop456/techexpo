@@ -53,7 +53,7 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 28),
             FadeSlideIn(
               delay: const Duration(milliseconds: 300),
-              child: _buildWeeklyInsights(children.isNotEmpty ? children.first.name : 'your children', ref),
+              child: _WeeklyInsightsSection(childName: children.isNotEmpty ? children.first.name : 'your children'),
             ),
           ],
         ),
@@ -363,12 +363,22 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildWeeklyInsights(String childName, WidgetRef ref) {
+}
+
+/// Isolated ConsumerWidget for AI insights to prevent whole DashboardScreen
+/// re-renders when AI insights state updates or reloads.
+class _WeeklyInsightsSection extends ConsumerWidget {
+  final String childName;
+
+  const _WeeklyInsightsSection({required this.childName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     // Get insights from provider
     final insightsState = ref.watch(insightsProvider);
     final insights = insightsState.insights;
     final isLoading = insightsState.isLoading;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
