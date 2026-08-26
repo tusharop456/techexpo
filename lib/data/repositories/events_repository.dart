@@ -6,6 +6,24 @@ class EventsRepository {
   final AppDatabase db;
   EventsRepository(this.db);
 
+  // Helper method to explicitly map Drift data class to domain model
+  BehavioralEvent _mapToDomain(BehavioralEventData data) {
+    return BehavioralEvent(
+      id: data.id,
+      childId: data.childId,
+      timestamp: data.timestamp,
+      durationSeconds: data.durationSeconds,
+      interactionCount: data.interactionCount,
+      newKnownContacts: data.newKnownContacts,
+      unknownContacts: data.unknownContacts,
+      appCategory: data.appCategory,
+      appName: data.appName,
+      deviceType: data.deviceType,
+      riskScore: data.riskScore,
+      riskLevel: data.riskLevel,
+    );
+  }
+
   // Watches the latest 50 behavioral events for a specific child
   Stream<List<BehavioralEvent>> getRecentEvents(String childId, {int limit = 50}) {
     return (db.select(db.behavioralEvents)
@@ -13,14 +31,15 @@ class EventsRepository {
           ..orderBy([(t) => OrderingTerm.desc(t.timestamp)])
           ..limit(limit))
         .watch()
-        .map((events) => events.cast<BehavioralEvent>());
+        .map((events) => events.map(_mapToDomain).toList());
   }
+
   Future<List<BehavioralEvent>> getEventsByDateRange(String childId, DateTime start, DateTime end) async {
     final results = await (db.select(db.behavioralEvents)
           ..where((t) => t.childId.equals(childId))
           ..where((t) => t.timestamp.isBetweenValues(start, end))
           ..orderBy([(t) => OrderingTerm.desc(t.timestamp)]))
         .get();
-    return results.cast<BehavioralEvent>();
+    return results.map(_mapToDomain).toList();
   }
 }
