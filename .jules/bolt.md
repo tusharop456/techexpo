@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-10 - Stateless Interval evaluation in AnimatedBuilder
+**Learning:** Instantiating `CurvedAnimation(parent: _controller, ...)` inside `AnimatedBuilder`'s builder callback registers new listeners on `_controller` on every single frame, causing object churn and severe listener leaks.
+**Action:** Evaluate interval curves statelessly using `Interval(...).transform(_controller.value)` instead of instantiating `CurvedAnimation`.
