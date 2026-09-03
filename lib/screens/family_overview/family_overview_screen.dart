@@ -18,7 +18,6 @@ class FamilyOverviewScreen extends ConsumerWidget {
     final activeCount = ref.watch(activeChildrenCountProvider);
     final avgRisk = ref.watch(averageRiskProvider);
     final activities = ref.watch(activitiesProvider);
-    final insightsState = ref.watch(insightsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -30,7 +29,7 @@ class FamilyOverviewScreen extends ConsumerWidget {
             _buildHeader(children.length),
             const SizedBox(height: 28),
             // AI Insights Section (right after welcome banner)
-            _buildInsightsSection(insightsState, ref),
+            const _FamilyInsightsSection(),
             const SizedBox(height: 28),
             _buildStatsRow(alertCount, activeCount, avgRisk),
             const SizedBox(height: 36),
@@ -47,80 +46,6 @@ class FamilyOverviewScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInsightsSection(InsightsState state, WidgetRef ref) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF667EEA), Color(0xFF764BA2)]),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('AI Insights', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -0.5)),
-                  Text('Smart analysis of digital habits', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                ],
-              ),
-            ),
-            if (!state.isLoading)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    const Text('Live', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600, fontSize: 12)),
-                  ],
-                ),
-              ),
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
-              onPressed: () => ref.read(insightsProvider.notifier).refresh(),
-              tooltip: 'Refresh insights',
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (state.isLoading)
-          const Center(child: CircularProgressIndicator())
-        else if (!state.hasEnoughData)
-          const NoInsightsWidget()
-        else
-          SizedBox(
-            height: 230,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: state.insights.length > 5 ? 5 : state.insights.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 16),
-              itemBuilder: (context, index) {
-                final insight = state.insights[index];
-                return SizedBox(
-                  width: 340,
-                  child: SmartInsightCard(
-                    insight: insight,
-                    onDismiss: () => ref.read(insightsProvider.notifier).dismissInsight(insight.id),
-                  ),
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
 
   Widget _buildHeader(int childCount) {
     return Container(
@@ -584,6 +509,90 @@ class FamilyOverviewScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Scoped ConsumerWidget for AI Insights section to prevent re-rendering
+/// header, child cards, and recent activity list on insights state changes.
+class _FamilyInsightsSection extends ConsumerWidget {
+  const _FamilyInsightsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(insightsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF667EEA), Color(0xFF764BA2)]),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('AI Insights', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -0.5)),
+                  Text('Smart analysis of digital habits', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            if (!state.isLoading)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+                    const SizedBox(width: 6),
+                    const Text('Live', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600, fontSize: 12)),
+                  ],
+                ),
+              ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
+              onPressed: () => ref.read(insightsProvider.notifier).refresh(),
+              tooltip: 'Refresh insights',
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (state.isLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (!state.hasEnoughData)
+          const NoInsightsWidget()
+        else
+          SizedBox(
+            height: 230,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: state.insights.length > 5 ? 5 : state.insights.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (context, index) {
+                final insight = state.insights[index];
+                return SizedBox(
+                  width: 340,
+                  child: SmartInsightCard(
+                    insight: insight,
+                    onDismiss: () => ref.read(insightsProvider.notifier).dismissInsight(insight.id),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 }
