@@ -68,12 +68,15 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
   }
 }
 
-/// StaggeredList - Automatically staggers children animations
-class StaggeredList extends StatelessWidget {
+/// StaggeredList - Automatically staggers children animations using a single AnimationController
+// Performance Optimization: Replaces N individual AnimationControllers and delayed timers per item
+// with a single AnimationController and progress-based Interval curves.
+class StaggeredList extends StatefulWidget {
   final List<Widget> children;
   final Duration itemDelay;
   final Duration itemDuration;
   final double offsetY;
+  final CrossAxisAlignment crossAxisAlignment;
 
   const StaggeredList({
     super.key,
@@ -81,20 +84,93 @@ class StaggeredList extends StatelessWidget {
     this.itemDelay = const Duration(milliseconds: 100),
     this.itemDuration = const Duration(milliseconds: 500),
     this.offsetY = 20,
+    this.crossAxisAlignment = CrossAxisAlignment.start,
   });
 
   @override
+  State<StaggeredList> createState() => _StaggeredListState();
+}
+
+class _StaggeredListState extends State<StaggeredList> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final count = widget.children.length;
+    final totalMs = count == 0
+        ? widget.itemDuration.inMilliseconds
+        : widget.itemDuration.inMilliseconds + widget.itemDelay.inMilliseconds * (count - 1);
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: totalMs > 0 ? totalMs : 1),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(StaggeredList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.children.length != oldWidget.children.length) {
+      final count = widget.children.length;
+      final totalMs = count == 0
+          ? widget.itemDuration.inMilliseconds
+          : widget.itemDuration.inMilliseconds + widget.itemDelay.inMilliseconds * (count - 1);
+      _controller.duration = Duration(milliseconds: totalMs > 0 ? totalMs : 1);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(children.length, (index) {
-        return FadeSlideIn(
-          delay: Duration(milliseconds: itemDelay.inMilliseconds * index),
-          duration: itemDuration,
-          offsetY: offsetY,
-          child: children[index],
+    final count = widget.children.length;
+    if (count == 0) {
+      return Column(
+        crossAxisAlignment: widget.crossAxisAlignment,
+        children: const [],
+      );
+    }
+
+    final totalMs = widget.itemDuration.inMilliseconds + widget.itemDelay.inMilliseconds * (count - 1);
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        return Column(
+          crossAxisAlignment: widget.crossAxisAlignment,
+          children: List.generate(count, (index) {
+            final startMs = widget.itemDelay.inMilliseconds * index;
+            final endMs = startMs + widget.itemDuration.inMilliseconds;
+            final start = totalMs > 0 ? (startMs / totalMs).clamp(0.0, 1.0) : 0.0;
+            final end = totalMs > 0 ? (endMs / totalMs).clamp(0.0, 1.0) : 1.0;
+
+            final intervalCurve = Interval(
+              start,
+              end > start ? end : (start + 0.001).clamp(0.0, 1.0),
+              curve: Curves.easeOutCubic,
+            );
+
+            final progress = intervalCurve.transform(t);
+            final opacity = progress.clamp(0.0, 1.0);
+            final dy = widget.offsetY * (1.0 - progress);
+
+            return Opacity(
+              opacity: opacity,
+              child: Transform.translate(
+                offset: Offset(0, dy),
+                child: widget.children[index],
+              ),
+            );
+          }),
         );
-      }),
+      },
     );
   }
 }
