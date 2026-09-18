@@ -147,6 +147,41 @@ class ScreenTimeScreen extends ConsumerWidget {
       {'name': 'Other', 'time': '12m', 'percent': 5.0, 'color': const Color(0xFF6B7280)},
     ];
 
+    // Single-pass optimization: construct both pie chart sections and legend widgets in one pass over `categories`
+    final sections = <PieChartSectionData>[];
+    final legendWidgets = <Widget>[];
+
+    for (final c in categories) {
+      final color = c['color'] as Color;
+      final percent = c['percent'] as double;
+      final name = c['name'] as String;
+      final time = c['time'] as String;
+
+      sections.add(
+        PieChartSectionData(
+          value: percent,
+          color: color,
+          radius: 45,
+          title: '${percent.toInt()}%',
+          titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+        ),
+      );
+
+      legendWidgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+              const SizedBox(width: 10),
+              SizedBox(width: 90, child: Text(name, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+              Text(time, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -174,13 +209,7 @@ class ScreenTimeScreen extends ConsumerWidget {
                     PieChartData(
                       sectionsSpace: 3,
                       centerSpaceRadius: 50,
-                      sections: categories.map((c) => PieChartSectionData(
-                        value: c['percent'] as double,
-                        color: c['color'] as Color,
-                        radius: 45,
-                        title: '${(c['percent'] as double).toInt()}%',
-                        titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                      )).toList(),
+                      sections: sections,
                     ),
                   ),
                 ),
@@ -188,17 +217,7 @@ class ScreenTimeScreen extends ConsumerWidget {
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: categories.map((c) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      children: [
-                        Container(width: 12, height: 12, decoration: BoxDecoration(color: c['color'] as Color, borderRadius: BorderRadius.circular(3))),
-                        const SizedBox(width: 10),
-                        SizedBox(width: 90, child: Text(c['name'] as String, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                        Text(c['time'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                      ],
-                    ),
-                  )).toList(),
+                  children: legendWidgets,
                 ),
               ],
             ),
