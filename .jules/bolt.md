@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-10 - CustomPainter Repaint Optimization in Gauge Widgets
+**Learning:** Returning `true` unconditionally from `CustomPainter.shouldRepaint` forces Flutter to re-draw canvas operations on every parent widget rebuild, leading to unnecessary CPU/GPU canvas rendering and object allocations.
+**Action:** Always implement property equality comparisons in `shouldRepaint` (e.g. `oldDelegate.score != score || oldDelegate.color != color`) and cache bounds/rects in `paint()`.
