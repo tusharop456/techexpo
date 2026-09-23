@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-10 - Single-pass Partitioning in Alerts Screen
+**Learning:** Multiple linear O(N) traversals (.where calls) on domain lists (like alerts) inside build methods or UI-layer helper methods lead to redundant CPU cycles and can trigger compile-time analyzer warnings for unused variables.
+**Action:** Consolidate filtering, partitioning, and counting into a single-pass O(N) loop in the build method and pass pre-computed values/lists down to child widgets.
