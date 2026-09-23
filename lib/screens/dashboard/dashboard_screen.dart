@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'package:child_safety_monitor/widgets/charts/risk_gauge.dart';
 import 'package:child_safety_monitor/widgets/smart_insight_card.dart';
 import 'package:child_safety_monitor/widgets/animated_widgets.dart';
-import 'package:child_safety_monitor/services/insights_engine.dart';
 import 'package:child_safety_monitor/providers/app_state.dart';
 import 'package:child_safety_monitor/providers/insights_provider.dart';
 import 'package:child_safety_monitor/core/constants/app_colors.dart';
