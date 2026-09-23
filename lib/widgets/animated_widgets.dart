@@ -68,8 +68,8 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
   }
 }
 
-/// StaggeredList - Automatically staggers children animations
-class StaggeredList extends StatelessWidget {
+/// StaggeredList - Automatically staggers children animations using a single AnimationController
+class StaggeredList extends StatefulWidget {
   final List<Widget> children;
   final Duration itemDelay;
   final Duration itemDuration;
@@ -84,15 +84,82 @@ class StaggeredList extends StatelessWidget {
   });
 
   @override
+  State<StaggeredList> createState() => _StaggeredListState();
+}
+
+class _StaggeredListState extends State<StaggeredList> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _initController();
+  }
+
+  void _initController() {
+    final count = widget.children.length;
+    final totalMs = count == 0
+        ? widget.itemDuration.inMilliseconds
+        : widget.itemDuration.inMilliseconds + (count - 1) * widget.itemDelay.inMilliseconds;
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: totalMs > 0 ? totalMs : 1),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(StaggeredList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.children.length != widget.children.length ||
+        oldWidget.itemDuration != widget.itemDuration ||
+        oldWidget.itemDelay != widget.itemDelay) {
+      _controller.dispose();
+      _initController();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final count = widget.children.length;
+    if (count == 0) {
+      return const Column(children: []);
+    }
+
+    final computedTotalMs = widget.itemDuration.inMilliseconds + (count - 1) * widget.itemDelay.inMilliseconds;
+    final totalMs = computedTotalMs > 0 ? computedTotalMs : 1;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(children.length, (index) {
-        return FadeSlideIn(
-          delay: Duration(milliseconds: itemDelay.inMilliseconds * index),
-          duration: itemDuration,
-          offsetY: offsetY,
-          child: children[index],
+      children: List.generate(count, (index) {
+        final startMs = index * widget.itemDelay.inMilliseconds;
+        final endMs = startMs + widget.itemDuration.inMilliseconds;
+        final start = (startMs / totalMs).clamp(0.0, 1.0);
+        final end = (endMs / totalMs).clamp(0.0, 1.0);
+        final interval = Interval(start, end, curve: Curves.easeOutCubic);
+
+        // Performance Optimization: Use a single AnimationController for the entire list
+        // and pass widget.children[index] as the child parameter to AnimatedBuilder to prevent rebuilds.
+        return AnimatedBuilder(
+          animation: _controller,
+          child: widget.children[index],
+          builder: (context, child) {
+            final curveProgress = interval.transform(_controller.value);
+            return Opacity(
+              opacity: curveProgress,
+              child: Transform.translate(
+                offset: Offset(0, widget.offsetY * (1.0 - curveProgress)),
+                child: child,
+              ),
+            );
+          },
         );
       }),
     );
