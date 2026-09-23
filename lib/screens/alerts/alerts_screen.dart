@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:child_safety_monitor/core/constants/app_colors.dart';
-import 'package:child_safety_monitor/providers/app_state.dart';
 import 'package:child_safety_monitor/data/models/app_models.dart';
 import 'package:child_safety_monitor/providers/database_provider.dart';
 
@@ -31,15 +30,26 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     final alertsAsync = ref.watch(mappedAlertsProvider);
     final alerts = alertsAsync.value ?? [];
-    final unreadCount = alerts.where((a) => !a.isRead).length;
+
+    // BOLT OPTIMIZATION: Single-pass list traversal to partition alerts and calculate
+    // unread/critical counts concurrently instead of multiple linear .where traversals.
+    final criticalAlerts = <AlertModel>[];
+    final resolvedAlerts = <AlertModel>[];
+    int unreadCount = 0;
+
+    for (final alert in alerts) {
+      if (!alert.isRead) unreadCount++;
+      if (alert.severity == 2) criticalAlerts.add(alert);
+      if (alert.isRead) resolvedAlerts.add(alert);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
           _buildHeader(unreadCount),
-          _buildTabBar(alerts),
-          Expanded(child: _buildAlertsList(alerts)),
+          _buildTabBar(alerts.length, criticalAlerts.length),
+          Expanded(child: _buildAlertsList(alerts, criticalAlerts, resolvedAlerts)),
         ],
       ),
     );
@@ -98,10 +108,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildTabBar(List<AlertModel> alerts) {
-    final criticalCount = alerts.where((a) => a.severity == 2).length;
-    final resolvedCount = alerts.where((a) => a.isRead).length;
-
+  Widget _buildTabBar(int totalCount, int criticalCount) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 32),
       decoration: BoxDecoration(
@@ -122,7 +129,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> with SingleTickerPr
         dividerColor: Colors.transparent,
         padding: const EdgeInsets.all(6),
         tabs: [
-          Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text('All'), const SizedBox(width: 8), _buildBadge('${alerts.length}', false)])),
+          Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text('All'), const SizedBox(width: 8), _buildBadge('$totalCount', false)])),
           Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text('Critical'), const SizedBox(width: 8), _buildBadge('$criticalCount', true)])),
           const Tab(text: 'Resolved'),
         ],
@@ -141,15 +148,19 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildAlertsList(List<AlertModel> alerts) {
+  Widget _buildAlertsList(
+    List<AlertModel> allAlerts,
+    List<AlertModel> criticalAlerts,
+    List<AlertModel> resolvedAlerts,
+  ) {
     return TabBarView(
       controller: _tabController,
       // Smooth swipe physics for premium feel
       physics: const BouncingScrollPhysics(),
       children: [
-        _buildAlertsListView(alerts, 'all'),
-        _buildAlertsListView(alerts.where((a) => a.severity == 2).toList(), 'critical'),
-        _buildAlertsListView(alerts.where((a) => a.isRead).toList(), 'resolved'),
+        _buildAlertsListView(allAlerts, 'all'),
+        _buildAlertsListView(criticalAlerts, 'critical'),
+        _buildAlertsListView(resolvedAlerts, 'resolved'),
       ],
     );
   }
