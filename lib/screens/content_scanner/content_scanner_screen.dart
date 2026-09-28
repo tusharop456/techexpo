@@ -285,7 +285,7 @@ class _ContentScannerScreenState extends State<ContentScannerScreen> {
             width: 140,
             height: 140,
             child: CustomPaint(
-              painter: _ScoreGaugePainter(
+              painter: ScoreGaugePainter(
                 score: result.safetyScore,
                 color: color,
               ),
@@ -573,16 +573,18 @@ class _ContentScannerScreenState extends State<ContentScannerScreen> {
 }
 
 /// Custom painter for the score gauge
-class _ScoreGaugePainter extends CustomPainter {
+class ScoreGaugePainter extends CustomPainter {
   final int score;
   final Color color;
 
-  _ScoreGaugePainter({required this.score, required this.color});
+  ScoreGaugePainter({required this.score, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 10;
+    // Cache rect to avoid recreating Rect objects per arc draw
+    final rect = Rect.fromCircle(center: center, radius: radius);
 
     // Background arc
     final bgPaint = Paint()
@@ -592,7 +594,7 @@ class _ScoreGaugePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
+      rect,
       -math.pi * 0.75,
       math.pi * 1.5,
       false,
@@ -608,7 +610,7 @@ class _ScoreGaugePainter extends CustomPainter {
 
     final sweepAngle = (score / 100) * math.pi * 1.5;
     canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
+      rect,
       -math.pi * 0.75,
       sweepAngle,
       false,
@@ -616,6 +618,9 @@ class _ScoreGaugePainter extends CustomPainter {
     );
   }
 
+  // Optimize repaints: only repaint when score or color changes
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant ScoreGaugePainter oldDelegate) {
+    return oldDelegate.score != score || oldDelegate.color != color;
+  }
 }
