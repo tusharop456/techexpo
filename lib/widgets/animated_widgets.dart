@@ -25,6 +25,7 @@ class FadeSlideIn extends StatefulWidget {
 
 class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late CurvedAnimation _curvedAnimation;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
@@ -33,14 +34,15 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
     super.initState();
     _controller = AnimationController(vsync: this, duration: widget.duration);
     
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: widget.curve),
-    );
+    // Cache single CurvedAnimation instance to avoid duplicate listener registrations
+    _curvedAnimation = CurvedAnimation(parent: _controller, curve: widget.curve);
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_curvedAnimation);
     
     _slideAnimation = Tween<Offset>(
       begin: Offset(0, widget.offsetY),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: widget.curve));
+    ).animate(_curvedAnimation);
 
     Future.delayed(widget.delay, () {
       if (mounted) _controller.forward();
@@ -49,6 +51,7 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
 
   @override
   void dispose() {
+    _curvedAnimation.dispose();
     _controller.dispose();
     super.dispose();
   }
