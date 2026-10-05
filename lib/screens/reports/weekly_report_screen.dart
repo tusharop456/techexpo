@@ -778,23 +778,30 @@ class _WeeklyReportScreenState extends ConsumerState<WeeklyReportScreen> {
       final db = ref.read(databaseProvider);
       final dbLogs = await db.getLast7DaysLogs(widget.childId);
       
-      // Convert database entries to ActivityLog model
-      final logs = dbLogs.map((entry) => ActivityLog(
-        id: entry.id,
-        childId: entry.childId,
-        screenTime: entry.screenTime,
-        timestamp: entry.timestamp,
-        category: _stringToCategory(entry.category),
-        appName: entry.appName,
-      )).toList();
-      
-      if (logs.isEmpty) {
+      if (dbLogs.isEmpty) {
         setState(() {
           _error = 'No activity data found for the past week. Please ensure there are activity logs in the database.';
           _isLoading = false;
         });
         return;
       }
+
+      // Convert database entries to ActivityLog model using fixed-length List.generate for performance
+      final logs = List<ActivityLog>.generate(
+        dbLogs.length,
+        (index) {
+          final entry = dbLogs[index];
+          return ActivityLog(
+            id: entry.id,
+            childId: entry.childId,
+            screenTime: entry.screenTime,
+            timestamp: entry.timestamp,
+            category: _stringToCategory(entry.category),
+            appName: entry.appName,
+          );
+        },
+        growable: false,
+      );
 
       final report = await weeklyReportService.generateWeeklyReport(
         childId: widget.childId,
