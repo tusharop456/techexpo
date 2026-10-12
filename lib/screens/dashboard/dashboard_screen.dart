@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'package:child_safety_monitor/widgets/charts/risk_gauge.dart';
 import 'package:child_safety_monitor/widgets/smart_insight_card.dart';
 import 'package:child_safety_monitor/widgets/animated_widgets.dart';
-import 'package:child_safety_monitor/services/insights_engine.dart';
 import 'package:child_safety_monitor/providers/app_state.dart';
 import 'package:child_safety_monitor/providers/insights_provider.dart';
 import 'package:child_safety_monitor/core/constants/app_colors.dart';
@@ -53,7 +52,9 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 28),
             FadeSlideIn(
               delay: const Duration(milliseconds: 300),
-              child: _buildWeeklyInsights(children.isNotEmpty ? children.first.name : 'your children', ref),
+              child: _WeeklyInsightsSection(
+                childName: children.isNotEmpty ? children.first.name : 'your children',
+              ),
             ),
           ],
         ),
@@ -69,7 +70,7 @@ class DashboardScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Analytics Dashboard', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -1)),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text('Monitor your family\'s online safety trends', style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
           ],
         ),
@@ -90,12 +91,12 @@ class DashboardScreen extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppColors.glassBorder.withValues(alpha: 0.2)),
               ),
-              child: Row(
+              child: const Row(
                 children: [
                   Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.textSecondary),
-                  const SizedBox(width: 10),
-                  const Text('Last 7 days', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 10),
+                  Text('Last 7 days', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                  SizedBox(width: 8),
                   Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
                 ],
               ),
@@ -279,7 +280,7 @@ class DashboardScreen extends ConsumerWidget {
                   show: true,
                   drawVerticalLine: false,
                   horizontalInterval: 2,
-                  getDrawingHorizontalLine: (value) => FlLine(color: AppColors.glass, strokeWidth: 1),
+                  getDrawingHorizontalLine: (value) => const FlLine(color: AppColors.glass, strokeWidth: 1),
                 ),
                 borderData: FlBorderData(show: false),
                 barGroups: [
@@ -362,13 +363,22 @@ class DashboardScreen extends ConsumerWidget {
       ],
     );
   }
+}
 
-  Widget _buildWeeklyInsights(String childName, WidgetRef ref) {
-    // Get insights from provider
+/// Extracted private ConsumerWidget to isolate AI Insights state rebuilds
+/// from the rest of the DashboardScreen (charts, gauges, metric cards).
+class _WeeklyInsightsSection extends ConsumerWidget {
+  final String childName;
+
+  const _WeeklyInsightsSection({required this.childName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Get insights from provider, localized to this private widget
     final insightsState = ref.watch(insightsProvider);
     final insights = insightsState.insights;
     final isLoading = insightsState.isLoading;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -433,8 +443,8 @@ class DashboardScreen extends ConsumerWidget {
         if (isLoading)
           Column(
             children: List.generate(3, (index) => 
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
                 child: ShimmerCard(height: 120),
               ),
             ),
@@ -469,7 +479,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 }
-
 
 // Demo button to trigger real-time alerts for competition
 class _DemoAlertButton extends StatefulWidget {
@@ -594,4 +603,3 @@ class _DemoAlertButtonState extends State<_DemoAlertButton> {
     );
   }
 }
-
