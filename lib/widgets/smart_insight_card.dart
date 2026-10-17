@@ -380,7 +380,7 @@ class InsightsListWidget extends StatelessWidget {
           ),
           const SizedBox(height: 20),
         ],
-        ...insights.map((insight) => SmartInsightCard(insight: insight)),
+        for (final insight in insights) SmartInsightCard(insight: insight),
       ],
     );
   }
