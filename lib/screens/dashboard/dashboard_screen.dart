@@ -433,8 +433,8 @@ class DashboardScreen extends ConsumerWidget {
         if (isLoading)
           Column(
             children: List.generate(3, (index) => 
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
                 child: ShimmerCard(height: 120),
               ),
             ),
@@ -455,16 +455,17 @@ class DashboardScreen extends ConsumerWidget {
             ),
           )
         else
-          ...insights.take(4).toList().asMap().entries.map((entry) => 
+          // Performance Optimization: Direct collection for loop eliminates intermediate
+          // List, Map, and Iterable allocations created by .take().toList().asMap().entries.map()
+          for (int i = 0; i < (insights.length < 4 ? insights.length : 4); i++)
             FadeSlideIn(
-              delay: Duration(milliseconds: 100 * entry.key),
+              delay: Duration(milliseconds: 100 * i),
               child: HoverScaleCard(
                 scale: 1.015,
                 borderRadius: BorderRadius.circular(20),
-                child: SmartInsightCard(insight: entry.value),
+                child: SmartInsightCard(insight: insights[i]),
               ),
             ),
-          ),
       ],
     );
   }
