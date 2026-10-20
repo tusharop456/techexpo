@@ -100,35 +100,40 @@ class _TasksRewardsScreenState extends ConsumerState<TasksRewardsScreen> with Si
       {'label': 'Level', 'value': 'Gold', 'icon': Icons.workspace_premium_rounded, 'color': const Color(0xFFF59E0B)},
     ];
 
+    // Performance optimization: Use a direct collection `for` loop instead of
+    // `.map(...).toList()` to eliminate intermediate iterable and list allocations.
     return Row(
-      children: stats.map((stat) => Expanded(
-        child: Container(
-          margin: EdgeInsets.only(right: stat != stats.last ? 16 : 0),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: (stat['color'] as Color).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
-                child: Icon(stat['icon'] as IconData, color: stat['color'] as Color, size: 24),
+      children: [
+        for (final stat in stats)
+          Expanded(
+            child: Container(
+              margin: EdgeInsets.only(right: stat != stats.last ? 16 : 0),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))],
               ),
-              const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(stat['value'] as String, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                  Text(stat['label'] as String, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: (stat['color'] as Color).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
+                    child: Icon(stat['icon'] as IconData, color: stat['color'] as Color, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(stat['value'] as String, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                      Text(stat['label'] as String, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                    ],
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      )).toList(),
+      ],
     );
   }
 
@@ -421,58 +426,66 @@ class _TasksRewardsScreenState extends ConsumerState<TasksRewardsScreen> with Si
         Wrap(
           spacing: 16,
           runSpacing: 16,
-          children: achievements.map((a) {
-            final earned = a['earned'] as bool;
-            return Container(
-              width: 200,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: earned
-                    ? LinearGradient(colors: [(a['color'] as Color).withValues(alpha: 0.15), (a['color'] as Color).withValues(alpha: 0.05)])
-                    : null,
-                color: earned ? null : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: earned ? (a['color'] as Color).withValues(alpha: 0.4) : Colors.grey.shade300),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: earned ? (a['color'] as Color).withValues(alpha: 0.2) : Colors.grey.shade200,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(a['icon'] as IconData, color: earned ? a['color'] as Color : Colors.grey, size: 22),
-                      ),
-                      if (earned) const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 24),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(a['title'] as String, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: earned ? AppColors.textPrimary : Colors.grey)),
-                  const SizedBox(height: 4),
-                  Text(a['desc'] as String, style: TextStyle(fontSize: 12, color: earned ? AppColors.textSecondary : Colors.grey.shade500)),
-                  if (!earned && a['progress'] != null) ...[
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: a['progress'] as double,
-                        backgroundColor: Colors.grey.shade300,
-                        valueColor: AlwaysStoppedAnimation(a['color'] as Color),
-                        minHeight: 6,
-                      ),
+          // Performance optimization: Use a direct collection `for` loop with a Builder
+          // to bind local variables once while avoiding `.map(...).toList()` intermediate iterable allocations.
+          children: [
+            for (final a in achievements)
+              Builder(
+                builder: (context) {
+                  final earned = a['earned'] as bool;
+                  final color = a['color'] as Color;
+                  return Container(
+                    width: 200,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: earned
+                          ? LinearGradient(colors: [color.withValues(alpha: 0.15), color.withValues(alpha: 0.05)])
+                          : null,
+                      color: earned ? null : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: earned ? color.withValues(alpha: 0.4) : Colors.grey.shade300),
                     ),
-                    const SizedBox(height: 4),
-                    Text('${((a['progress'] as double) * 100).toInt()}% complete', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                  ],
-                ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: earned ? color.withValues(alpha: 0.2) : Colors.grey.shade200,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(a['icon'] as IconData, color: earned ? color : Colors.grey, size: 22),
+                            ),
+                            if (earned) const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 24),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(a['title'] as String, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: earned ? AppColors.textPrimary : Colors.grey)),
+                        const SizedBox(height: 4),
+                        Text(a['desc'] as String, style: TextStyle(fontSize: 12, color: earned ? AppColors.textSecondary : Colors.grey.shade500)),
+                        if (!earned && a['progress'] != null) ...[
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: a['progress'] as double,
+                              backgroundColor: Colors.grey.shade300,
+                              valueColor: AlwaysStoppedAnimation(color),
+                              minHeight: 6,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('${((a['progress'] as double) * 100).toInt()}% complete', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        ],
+                      ],
+                    ),
+                  );
+                },
               ),
-            );
-          }).toList(),
+          ],
         ),
       ],
     );
