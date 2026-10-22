@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-10 - Single Controller Staggered Animations
+**Learning:** Wrapping children of a list in separate `AnimationController` widgets and delayed `Future.delayed` timers creates allocation churn and ticker overhead. Driving staggered offsets via a single `AnimationController` with interval fraction calculations eliminates N controllers and avoids frame-by-frame `CurvedAnimation` object allocations.
+**Action:** Use a single `AnimationController` and compute progress intervals directly for staggered list animations.
