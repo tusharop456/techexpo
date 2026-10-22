@@ -196,14 +196,69 @@ class _ChildProfileScreenState extends ConsumerState<ChildProfileScreen> {
   }
 
   Widget _buildScreenTimeCard() {
-    final totalHours = _screenTimeData.fold<double>(0, (sum, d) => sum + (d['hours'] as double));
+    double totalHours = 0;
+    final sections = <PieChartSectionData>[];
+    final legendWidgets = <Widget>[];
+
+    // Single-pass O(N) loop to compute total hours, pie chart sections,
+    // and legend item widgets simultaneously, eliminating 2 extra linear traversals (.fold and .map).
+    for (final d in _screenTimeData) {
+      final hours = d['hours'] as double;
+      final color = d['color'] as Color;
+      totalHours += hours;
+
+      sections.add(PieChartSectionData(
+        value: hours,
+        color: color,
+        radius: 35,
+        showTitle: false,
+      ));
+
+      legendWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  d['category'] as String,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                ),
+              ),
+              Text(
+                '${hours}h',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,11 +266,27 @@ class _ChildProfileScreenState extends ConsumerState<ChildProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Screen Time Today', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              const Text(
+                'Screen Time Today',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text('${totalHours.toStringAsFixed(1)}h total', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${totalHours.toStringAsFixed(1)}h total',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
@@ -229,29 +300,14 @@ class _ChildProfileScreenState extends ConsumerState<ChildProfileScreen> {
                   PieChartData(
                     sectionsSpace: 3,
                     centerSpaceRadius: 40,
-                    sections: _screenTimeData.map((d) => PieChartSectionData(
-                      value: d['hours'] as double,
-                      color: d['color'] as Color,
-                      radius: 35,
-                      showTitle: false,
-                    )).toList(),
+                    sections: sections,
                   ),
                 ),
               ),
               const SizedBox(width: 32),
               Expanded(
                 child: Column(
-                  children: _screenTimeData.map((d) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        Container(width: 14, height: 14, decoration: BoxDecoration(color: d['color'] as Color, borderRadius: BorderRadius.circular(4))),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(d['category'] as String, style: const TextStyle(color: AppColors.textPrimary))),
-                        Text('${d['hours']}h', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                      ],
-                    ),
-                  )).toList(),
+                  children: legendWidgets,
                 ),
               ),
             ],
