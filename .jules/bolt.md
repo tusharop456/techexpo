@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-10 - Direct Type Casting on Drift Queries Fails
+**Learning:** Drift-generated data classes (e.g., `BehavioralEventData`) do not inherit from domain models (`BehavioralEvent`). Using `.cast<BehavioralEvent>()` on query stream/future results causes runtime TypeErrors.
+**Action:** Use explicit `.map(_mapToDomain)` transformation methods when returning domain models from Drift repository classes.
