@@ -98,43 +98,47 @@ class ScreenTimeScreen extends ConsumerWidget {
       {'label': 'Avg Session', 'value': '12m', 'icon': Icons.hourglass_bottom_rounded, 'color': const Color(0xFF10B981), 'change': 'Normal'},
     ];
 
+    // Optimized using collection for loop to eliminate intermediate iterable and list allocations
     return Row(
-      children: stats.map((stat) => Expanded(
-        child: Container(
-          margin: EdgeInsets.only(right: stat != stats.last ? 16 : 0),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: (stat['color'] as Color).withValues(alpha: 0.2)),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        for (final stat in stats)
+          Expanded(
+            child: Container(
+              margin: EdgeInsets.only(right: stat != stats.last ? 16 : 0),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: (stat['color'] as Color).withValues(alpha: 0.2)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: (stat['color'] as Color).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                    child: Icon(stat['icon'] as IconData, color: stat['color'] as Color, size: 22),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: (stat['color'] as Color).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                        child: Icon(stat['icon'] as IconData, color: stat['color'] as Color, size: 22),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                        child: Text(stat['change'] as String, style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                    child: Text(stat['change'] as String, style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
+                  const SizedBox(height: 16),
+                  Text(stat['value'] as String, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -0.5)),
+                  const SizedBox(height: 4),
+                  Text(stat['label'] as String, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text(stat['value'] as String, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -0.5)),
-              const SizedBox(height: 4),
-              Text(stat['label'] as String, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-            ],
+            ),
           ),
-        ),
-      )).toList(),
+      ],
     );
   }
 
@@ -295,26 +299,27 @@ class ScreenTimeScreen extends ConsumerWidget {
                 ),
                 gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 2, getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.shade200, strokeWidth: 1)),
                 borderData: FlBorderData(show: false),
-                barGroups: weekData.asMap().entries.map((entry) {
-                  final isWeekend = entry.key >= 5;
-                  return BarChartGroupData(
-                    x: entry.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: entry.value['hours'] as double,
-                        width: 28,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                        gradient: LinearGradient(
-                          colors: isWeekend
-                              ? [const Color(0xFFF59E0B), const Color(0xFFEF4444)]
-                              : [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
+                // Optimized with collection for loop to eliminate MapEntry and iterable allocations
+                barGroups: [
+                  for (int i = 0; i < weekData.length; i++)
+                    BarChartGroupData(
+                      x: i,
+                      barRods: [
+                        BarChartRodData(
+                          toY: weekData[i]['hours'] as double,
+                          width: 28,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                          gradient: LinearGradient(
+                            colors: i >= 5
+                                ? [const Color(0xFFF59E0B), const Color(0xFFEF4444)]
+                                : [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                }).toList(),
+                      ],
+                    ),
+                ],
               ),
             ),
           ),
@@ -356,67 +361,69 @@ class ScreenTimeScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          ...apps.map((app) => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: (app['usage'] as double) > 0.8 ? AppColors.warning.withValues(alpha: 0.3) : Colors.transparent),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: (app['color'] as Color).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
-                  child: Icon(app['icon'] as IconData, color: app['color'] as Color, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(app['name'] as String, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Text(app['time'] as String, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                          const Text(' / ', style: TextStyle(color: AppColors.textSecondary)),
-                          Text(app['limit'] as String, style: TextStyle(fontSize: 13, color: (app['usage'] as double) > 0.8 ? AppColors.warning : AppColors.textSecondary)),
-                        ],
-                      ),
-                    ],
+          // Optimized with collection for loop to eliminate MappedListIterable allocations
+          for (final app in apps)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: (app['usage'] as double) > 0.8 ? AppColors.warning.withValues(alpha: 0.3) : Colors.transparent),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: (app['color'] as Color).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
+                    child: Icon(app['icon'] as IconData, color: app['color'] as Color, size: 24),
                   ),
-                ),
-                if ((app['usage'] as double) > 0)
-                  SizedBox(
-                    width: 120,
+                  const SizedBox(width: 16),
+                  Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${((app['usage'] as double) * 100).toInt()}% used', style: TextStyle(fontSize: 12, color: (app['usage'] as double) > 0.8 ? AppColors.warning : AppColors.textSecondary)),
+                        Text(app['name'] as String, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                         const SizedBox(height: 6),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: app['usage'] as double,
-                            backgroundColor: Colors.grey.shade200,
-                            valueColor: AlwaysStoppedAnimation((app['usage'] as double) > 0.8 ? AppColors.warning : AppColors.success),
-                            minHeight: 6,
-                          ),
+                        Row(
+                          children: [
+                            Text(app['time'] as String, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                            const Text(' / ', style: TextStyle(color: AppColors.textSecondary)),
+                            Text(app['limit'] as String, style: TextStyle(fontSize: 13, color: (app['usage'] as double) > 0.8 ? AppColors.warning : AppColors.textSecondary)),
+                          ],
                         ),
                       ],
                     ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                    child: const Text('No Limit', style: TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
                   ),
-              ],
+                  if ((app['usage'] as double) > 0)
+                    SizedBox(
+                      width: 120,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('${((app['usage'] as double) * 100).toInt()}% used', style: TextStyle(fontSize: 12, color: (app['usage'] as double) > 0.8 ? AppColors.warning : AppColors.textSecondary)),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: app['usage'] as double,
+                              backgroundColor: Colors.grey.shade200,
+                              valueColor: AlwaysStoppedAnimation((app['usage'] as double) > 0.8 ? AppColors.warning : AppColors.success),
+                              minHeight: 6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                      child: const Text('No Limit', style: TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                ],
+              ),
             ),
-          )),
         ],
       ),
     );
@@ -471,37 +478,39 @@ class ScreenTimeScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          ...limits.map((limit) => Padding(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(width: 10, height: 10, decoration: BoxDecoration(color: limit['color'] as Color, borderRadius: BorderRadius.circular(3))),
-                        const SizedBox(width: 10),
-                        Text(limit['category'] as String, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      ],
-                    ),
-                    Text('${limit['current']} / ${limit['limit']}', style: TextStyle(fontSize: 14, color: (limit['percent'] as double) > 0.8 ? AppColors.warning : AppColors.textSecondary)),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: limit['percent'] as double,
-                    backgroundColor: Colors.grey.shade200,
-                    valueColor: AlwaysStoppedAnimation((limit['percent'] as double) > 0.8 ? AppColors.warning : limit['color'] as Color),
-                    minHeight: 10,
+          // Optimized with collection for loop to eliminate MappedListIterable allocations
+          for (final limit in limits)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(width: 10, height: 10, decoration: BoxDecoration(color: limit['color'] as Color, borderRadius: BorderRadius.circular(3))),
+                          const SizedBox(width: 10),
+                          Text(limit['category'] as String, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        ],
+                      ),
+                      Text('${limit['current']} / ${limit['limit']}', style: TextStyle(fontSize: 14, color: (limit['percent'] as double) > 0.8 ? AppColors.warning : AppColors.textSecondary)),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: limit['percent'] as double,
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: AlwaysStoppedAnimation((limit['percent'] as double) > 0.8 ? AppColors.warning : limit['color'] as Color),
+                      minHeight: 10,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          )),
         ],
       ),
     );
