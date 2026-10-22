@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'package:child_safety_monitor/widgets/charts/risk_gauge.dart';
 import 'package:child_safety_monitor/widgets/smart_insight_card.dart';
 import 'package:child_safety_monitor/widgets/animated_widgets.dart';
-import 'package:child_safety_monitor/services/insights_engine.dart';
 import 'package:child_safety_monitor/providers/app_state.dart';
 import 'package:child_safety_monitor/providers/insights_provider.dart';
 import 'package:child_safety_monitor/core/constants/app_colors.dart';
@@ -51,9 +50,9 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 28),
-            FadeSlideIn(
-              delay: const Duration(milliseconds: 300),
-              child: _buildWeeklyInsights(children.isNotEmpty ? children.first.name : 'your children', ref),
+            const FadeSlideIn(
+              delay: Duration(milliseconds: 300),
+              child: _WeeklyInsightsSection(),
             ),
           ],
         ),
@@ -69,7 +68,7 @@ class DashboardScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Analytics Dashboard', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -1)),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text('Monitor your family\'s online safety trends', style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
           ],
         ),
@@ -362,13 +361,18 @@ class DashboardScreen extends ConsumerWidget {
       ],
     );
   }
+}
 
-  Widget _buildWeeklyInsights(String childName, WidgetRef ref) {
+class _WeeklyInsightsSection extends ConsumerWidget {
+  const _WeeklyInsightsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     // Get insights from provider
     final insightsState = ref.watch(insightsProvider);
     final insights = insightsState.insights;
     final isLoading = insightsState.isLoading;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -433,8 +437,8 @@ class DashboardScreen extends ConsumerWidget {
         if (isLoading)
           Column(
             children: List.generate(3, (index) => 
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
                 child: ShimmerCard(height: 120),
               ),
             ),
@@ -455,13 +459,13 @@ class DashboardScreen extends ConsumerWidget {
             ),
           )
         else
-          ...insights.take(4).toList().asMap().entries.map((entry) => 
+          ...insights.take(4).indexed.map((entry) =>
             FadeSlideIn(
-              delay: Duration(milliseconds: 100 * entry.key),
+              delay: Duration(milliseconds: 100 * entry.$1),
               child: HoverScaleCard(
                 scale: 1.015,
                 borderRadius: BorderRadius.circular(20),
-                child: SmartInsightCard(insight: entry.value),
+                child: SmartInsightCard(insight: entry.$2),
               ),
             ),
           ),
