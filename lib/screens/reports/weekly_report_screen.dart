@@ -460,9 +460,11 @@ class _WeeklyReportScreenState extends ConsumerState<WeeklyReportScreen> {
       title: '🔍 Key Observations',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: report.keyObservations
-            .map((obs) => _buildBulletPoint(obs, const Color(0xFF00D9FF)))
-            .toList(),
+        children: [
+          // Direct collection for loop avoids intermediate list allocation on rebuild
+          for (final obs in report.keyObservations)
+            _buildBulletPoint(obs, const Color(0xFF00D9FF)),
+        ],
       ),
     );
   }
@@ -473,9 +475,11 @@ class _WeeklyReportScreenState extends ConsumerState<WeeklyReportScreen> {
       borderColor: Colors.amber.withValues(alpha:0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: report.concerns
-            .map((concern) => _buildBulletPoint(concern, Colors.amber))
-            .toList(),
+        children: [
+          // Direct collection for loop avoids intermediate list allocation on rebuild
+          for (final concern in report.concerns)
+            _buildBulletPoint(concern, Colors.amber),
+        ],
       ),
     );
   }
@@ -486,9 +490,11 @@ class _WeeklyReportScreenState extends ConsumerState<WeeklyReportScreen> {
       borderColor: Colors.greenAccent.withValues(alpha:0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: report.positiveHighlights
-            .map((highlight) => _buildBulletPoint(highlight, Colors.greenAccent))
-            .toList(),
+        children: [
+          // Direct collection for loop avoids intermediate list allocation on rebuild
+          for (final highlight in report.positiveHighlights)
+            _buildBulletPoint(highlight, Colors.greenAccent),
+        ],
       ),
     );
   }
@@ -498,11 +504,11 @@ class _WeeklyReportScreenState extends ConsumerState<WeeklyReportScreen> {
       title: '💡 Recommendations',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: report.recommendations
-            .asMap()
-            .entries
-            .map((entry) => _buildNumberedPoint(entry.key + 1, entry.value))
-            .toList(),
+        children: [
+          // Index-based collection for loop eliminates map entries allocation
+          for (int i = 0; i < report.recommendations.length; i++)
+            _buildNumberedPoint(i + 1, report.recommendations[i]),
+        ],
       ),
     );
   }
@@ -511,37 +517,59 @@ class _WeeklyReportScreenState extends ConsumerState<WeeklyReportScreen> {
     return _buildGlassCard(
       title: '📱 Top Apps',
       child: Column(
-        children: report.topApps.map((app) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00D9FF).withValues(alpha:0.2),
-                    borderRadius: BorderRadius.circular(8),
+        children: [
+          // Direct collection for loop avoids intermediate list allocation on rebuild
+          for (final app in report.topApps)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00D9FF).withValues(alpha:0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _getCategoryIcon(app.category),
+                      color: const Color(0xFF00D9FF),
+                      size: 20,
+                    ),
                   ),
-                  child: Icon(
-                    _getCategoryIcon(app.category),
-                    color: const Color(0xFF00D9FF),
-                    size: 20,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          app.appName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          app.category,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha:0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        app.appName,
+                        '${app.totalMinutes}m',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        app.category,
+                        '${app.percentage}%',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha:0.5),
                           fontSize: 12,
@@ -549,30 +577,10 @@ class _WeeklyReportScreenState extends ConsumerState<WeeklyReportScreen> {
                       ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${app.totalMinutes}m',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '${app.percentage}%',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha:0.5),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          );
-        }).toList(),
+        ],
       ),
     );
   }
@@ -581,41 +589,43 @@ class _WeeklyReportScreenState extends ConsumerState<WeeklyReportScreen> {
     return _buildGlassCard(
       title: '📊 Category Breakdown',
       child: Column(
-        children: report.categoryStats.map((cat) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      cat.name,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    Text(
-                      '${cat.totalMinutes}m (${cat.percentage}%)',
-                      style: TextStyle(color: Colors.white.withValues(alpha:0.7)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: cat.percentage / 100,
-                    backgroundColor: Colors.white.withValues(alpha:0.1),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      _getCategoryColor(cat.name),
-                    ),
-                    minHeight: 6,
+        children: [
+          // Direct collection for loop avoids intermediate list allocation on rebuild
+          for (final cat in report.categoryStats)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        cat.name,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      Text(
+                        '${cat.totalMinutes}m (${cat.percentage}%)',
+                        style: TextStyle(color: Colors.white.withValues(alpha:0.7)),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: cat.percentage / 100,
+                      backgroundColor: Colors.white.withValues(alpha:0.1),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _getCategoryColor(cat.name),
+                      ),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          );
-        }).toList(),
+        ],
       ),
     );
   }

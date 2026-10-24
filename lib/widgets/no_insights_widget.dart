@@ -187,29 +187,33 @@ class NoInsightsWidget extends StatelessWidget {
       spacing: 12,
       runSpacing: 12,
       alignment: WrapAlignment.center,
-      children: features.map((f) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.8),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF667EEA).withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(f['icon'] as IconData, size: 16, color: const Color(0xFF667EEA)),
-            const SizedBox(width: 8),
-            Text(
-              f['text'] as String,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w500,
-              ),
+      children: [
+        // Collection for loop avoids intermediate list allocation during widget builds
+        for (final f in features)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF667EEA).withValues(alpha: 0.2)),
             ),
-          ],
-        ),
-      )).toList(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(f['icon'] as IconData, size: 16, color: const Color(0xFF667EEA)),
+                const SizedBox(width: 8),
+                Text(
+                  f['text'] as String,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

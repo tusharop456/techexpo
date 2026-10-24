@@ -380,7 +380,8 @@ class InsightsListWidget extends StatelessWidget {
           ),
           const SizedBox(height: 20),
         ],
-        ...insights.map((insight) => SmartInsightCard(insight: insight)),
+        // Collection for loop avoids intermediate iterable allocation during widget builds
+        for (final insight in insights) SmartInsightCard(insight: insight),
       ],
     );
   }
