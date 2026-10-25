@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'package:child_safety_monitor/widgets/charts/risk_gauge.dart';
 import 'package:child_safety_monitor/widgets/smart_insight_card.dart';
 import 'package:child_safety_monitor/widgets/animated_widgets.dart';
-import 'package:child_safety_monitor/services/insights_engine.dart';
 import 'package:child_safety_monitor/providers/app_state.dart';
 import 'package:child_safety_monitor/providers/insights_provider.dart';
 import 'package:child_safety_monitor/core/constants/app_colors.dart';
@@ -455,16 +454,16 @@ class DashboardScreen extends ConsumerWidget {
             ),
           )
         else
-          ...insights.take(4).toList().asMap().entries.map((entry) => 
+          // Optimized: Direct collection for loop avoids intermediate List, Map, and Iterable allocations on rebuilds.
+          for (int i = 0; i < (insights.length < 4 ? insights.length : 4); i++)
             FadeSlideIn(
-              delay: Duration(milliseconds: 100 * entry.key),
+              delay: Duration(milliseconds: 100 * i),
               child: HoverScaleCard(
                 scale: 1.015,
                 borderRadius: BorderRadius.circular(20),
-                child: SmartInsightCard(insight: entry.value),
+                child: SmartInsightCard(insight: insights[i]),
               ),
             ),
-          ),
       ],
     );
   }
