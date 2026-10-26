@@ -19,6 +19,8 @@ class AlertPopup extends StatefulWidget {
 
 class _AlertPopupState extends State<AlertPopup> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late CurvedAnimation _scaleCurvedAnimation;
+  late CurvedAnimation _fadeCurvedAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
 
@@ -30,13 +32,17 @@ class _AlertPopupState extends State<AlertPopup> with SingleTickerProviderStateM
       vsync: this,
     );
     
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    _scaleCurvedAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
     );
-    
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    _fadeCurvedAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
     );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(_scaleCurvedAnimation);
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_fadeCurvedAnimation);
     
     _controller.forward();
     
@@ -50,6 +56,8 @@ class _AlertPopupState extends State<AlertPopup> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _scaleCurvedAnimation.dispose();
+    _fadeCurvedAnimation.dispose();
     _controller.dispose();
     super.dispose();
   }

@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-10 - Animation Listener Cleanup for CurvedAnimation
+**Learning:** In Flutter, instantiating `CurvedAnimation` inline in `Tween.animate(...)` attaches internal listeners to `AnimationController` that are not automatically unregistered if `.dispose()` is not explicitly invoked on the `CurvedAnimation`.
+**Action:** Always store `CurvedAnimation` as a state member variable and call `_curvedAnimation.dispose()` prior to `_controller.dispose()` in `dispose()`.
