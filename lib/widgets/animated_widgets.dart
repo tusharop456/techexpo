@@ -231,6 +231,7 @@ class PulseWidget extends StatefulWidget {
 
 class _PulseWidgetState extends State<PulseWidget> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late CurvedAnimation _curvedAnimation;
   late Animation<double> _scaleAnimation;
 
   @override
@@ -238,19 +239,22 @@ class _PulseWidgetState extends State<PulseWidget> with SingleTickerProviderStat
     super.initState();
     _controller = AnimationController(vsync: this, duration: widget.duration);
     
+    _curvedAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+
     _scaleAnimation = Tween<double>(
       begin: widget.minScale,
       end: widget.maxScale,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(_curvedAnimation);
 
     _controller.repeat(reverse: true);
   }
 
   @override
   void dispose() {
+    _curvedAnimation.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -446,6 +450,8 @@ class AnimatedSearchBar extends StatefulWidget {
 class _AnimatedSearchBarState extends State<AnimatedSearchBar> 
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late CurvedAnimation _widthCurvedAnimation;
+  late CurvedAnimation _opacityCurvedAnimation;
   late Animation<double> _widthAnimation;
   late Animation<double> _opacityAnimation;
   final TextEditingController _textController = TextEditingController();
@@ -457,20 +463,22 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
     super.initState();
     _controller = AnimationController(vsync: this, duration: widget.duration);
     
+    _widthCurvedAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    
+    _opacityCurvedAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
+    );
+
     _widthAnimation = Tween<double>(
       begin: widget.collapsedWidth,
       end: widget.expandedWidth,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
-    
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
-      ),
-    );
+    ).animate(_widthCurvedAnimation);
+
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_opacityCurvedAnimation);
     
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus && _textController.text.isEmpty) {
@@ -499,6 +507,8 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
   
   @override
   void dispose() {
+    _widthCurvedAnimation.dispose();
+    _opacityCurvedAnimation.dispose();
     _controller.dispose();
     _textController.dispose();
     _focusNode.dispose();
