@@ -444,7 +444,9 @@ class _SmartRulesScreenState extends State<SmartRulesScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            ...(_aiSuggestion!.suggestedRules.map((rule) => _buildSuggestedRuleCard(rule))),
+            // Optimized: Replace .map(...) iterable allocation with collection for loop
+            for (final rule in _aiSuggestion!.suggestedRules)
+              _buildSuggestedRuleCard(rule),
           ],
         ],
       ),
@@ -618,7 +620,8 @@ class _SmartRulesScreenState extends State<SmartRulesScreen> {
             ),
           )
         else
-          ...(_rules.map((rule) => _buildRuleCard(rule))),
+          // Optimized: Replace .map(...) iterable allocation with collection for loop
+          for (final rule in _rules) _buildRuleCard(rule),
       ],
     );
   }
@@ -696,17 +699,19 @@ class _SmartRulesScreenState extends State<SmartRulesScreen> {
                   spacing: 6,
                   children: [
                     if (rule.blockedCategories.isNotEmpty)
-                      ...rule.blockedCategories.take(2).map((cat) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
+                      // Optimized: Replace .map(...) iterable allocation with collection for loop
+                      for (final cat in rule.blockedCategories.take(2))
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '🚫 $cat',
+                            style: const TextStyle(fontSize: 11, color: AppColors.error),
+                          ),
                         ),
-                        child: Text(
-                          '🚫 $cat',
-                          style: const TextStyle(fontSize: 11, color: AppColors.error),
-                        ),
-                      )),
                   ],
                 ),
               ],
@@ -748,25 +753,27 @@ class _SmartRulesScreenState extends State<SmartRulesScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          ...(_aiSuggestion!.insights.map((insight) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('• ', style: TextStyle(color: Color(0xFF10B981), fontSize: 14)),
-                Expanded(
-                  child: Text(
-                    insight,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                      height: 1.4,
+          // Optimized: Replace .map(...) iterable allocation with collection for loop
+          for (final insight in _aiSuggestion!.insights)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• ', style: TextStyle(color: Color(0xFF10B981), fontSize: 14)),
+                  Expanded(
+                    child: Text(
+                      insight,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ))),
         ],
       ),
     );
