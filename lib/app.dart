@@ -426,7 +426,8 @@ class _HistoryScreen extends ConsumerWidget {
           children: [
             _buildPageHeader('Activity History', 'Track all activities and events'),
             const SizedBox(height: 32),
-            ...activities.map((activity) => _buildTimelineItem(activity)),
+            // Bolt: Direct collection for-loop avoids intermediate iterable allocation on rebuild
+            for (final activity in activities) _buildTimelineItem(activity),
           ],
         ),
       ),
@@ -523,7 +524,8 @@ class _ChildrenScreen extends ConsumerWidget {
             if (children.isEmpty)
               _buildEmptyState()
             else
-              ...children.map((child) => _buildChildCard(context, ref, child)),
+              // Bolt: Direct collection for-loop avoids intermediate iterable allocation on rebuild
+              for (final child in children) _buildChildCard(context, ref, child),
           ],
         ),
       ),
