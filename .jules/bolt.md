@@ -5,3 +5,7 @@
 ## 2026-07-10 - N+1 Bottleneck in Insights Provider
 **Learning:** The insights provider was fetching database records sequentially for each child in a family. This creates an N+1 query pattern that scales poorly.
 **Action:** Use Future.wait to parallelize independent database fetches within providers.
+
+## 2026-07-11 - CustomPainter Repaint & Object Allocation Optimization
+**Learning:** `CustomPainter.shouldRepaint` defaulting to `true` causes canvas repaints on every parent widget rebuild regardless of whether paint inputs changed. Additionally, creating intermediate objects like `Rect.fromCircle` inside `paint()` during frame rendering causes unnecessary allocations.
+**Action:** Always implement property comparison in `shouldRepaint` and cache local bounding shapes in `paint()`.
