@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'package:child_safety_monitor/widgets/charts/risk_gauge.dart';
 import 'package:child_safety_monitor/widgets/smart_insight_card.dart';
 import 'package:child_safety_monitor/widgets/animated_widgets.dart';
-import 'package:child_safety_monitor/services/insights_engine.dart';
 import 'package:child_safety_monitor/providers/app_state.dart';
 import 'package:child_safety_monitor/providers/insights_provider.dart';
 import 'package:child_safety_monitor/core/constants/app_colors.dart';
@@ -53,7 +52,9 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 28),
             FadeSlideIn(
               delay: const Duration(milliseconds: 300),
-              child: _buildWeeklyInsights(children.isNotEmpty ? children.first.name : 'your children', ref),
+              child: _DashboardInsightsSection(
+                childName: children.isNotEmpty ? children.first.name : 'your children',
+              ),
             ),
           ],
         ),
@@ -363,12 +364,22 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildWeeklyInsights(String childName, WidgetRef ref) {
-    // Get insights from provider
+}
+
+/// BOLT: Scoped ConsumerWidget to isolate insightsProvider re-renders from the rest of DashboardScreen,
+/// and uses a direct collection for-loop to prevent intermediate allocations.
+class _DashboardInsightsSection extends ConsumerWidget {
+  final String childName;
+
+  const _DashboardInsightsSection({required this.childName});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final insightsState = ref.watch(insightsProvider);
     final insights = insightsState.insights;
     final isLoading = insightsState.isLoading;
-    
+    final count = insights.length > 4 ? 4 : insights.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -455,16 +466,15 @@ class DashboardScreen extends ConsumerWidget {
             ),
           )
         else
-          ...insights.take(4).toList().asMap().entries.map((entry) => 
+          for (int i = 0; i < count; i++)
             FadeSlideIn(
-              delay: Duration(milliseconds: 100 * entry.key),
+              delay: Duration(milliseconds: 100 * i),
               child: HoverScaleCard(
                 scale: 1.015,
                 borderRadius: BorderRadius.circular(20),
-                child: SmartInsightCard(insight: entry.value),
+                child: SmartInsightCard(insight: insights[i]),
               ),
             ),
-          ),
       ],
     );
   }
